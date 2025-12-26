@@ -26,6 +26,7 @@ namespace SysBot.Pokemon.Discord
         // -------------------------------
         [Command("mysterymon")]
         [Alias("mm", "mystery", "surprise")]
+        [RequireQueueRole(nameof(DiscordManager.RolesMysteryMon))]
         public async Task MysteryMonAsync()
         {
             var userID = Context.User.Id;
@@ -44,7 +45,7 @@ namespace SysBot.Pokemon.Discord
         // -------------------------------
         [Command("mysterymon")]
         [Alias("mm", "mystery", "surprise")]
-        [RequireQueueRole(nameof(DiscordManager.RolesTrade))]
+        [RequireQueueRole(nameof(DiscordManager.RolesMysteryMon))]
         public async Task MysteryMonAsync(int code)
         {
             var userID = Context.User.Id;

@@ -98,7 +98,7 @@ namespace SysBot.Pokemon.Discord.Modules
         [Command("homereadyrequest")]
         [Alias("hrr")]
         [Summary("Downloads a HOME-ready PKM and queues it for trade.")]
-        [RequireQueueRole(nameof(DiscordManager.RolesTrade))]
+        [RequireQueueRole(nameof(DiscordManager.RolesHomeReadyRequest))]
         private async Task HOMEReadyRequestAsync(int index)
         {
             if (string.IsNullOrWhiteSpace(HOMEFolder))

@@ -883,7 +883,7 @@ public class PokeTradeBotPLZA(PokeTradeHub<PA9> Hub, PokeBotState Config) : Poke
                         $"Found trade partner: {partner.TrainerName}. " +
                         $"**TID**: {partner.TID7} **SID**: {partner.SID7}");
 
-                    if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT)
+                    if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
                     {
                         tradesToProcess[0] = await ApplyAutoOT(
                             tradesToProcess[0],
@@ -979,6 +979,7 @@ public class PokeTradeBotPLZA(PokeTradeHub<PA9> Hub, PokeBotState Config) : Poke
 
                     if (Hub.Config.Legality.UseTradePartnerInfo &&
                         !poke.IgnoreAutoOT &&
+                        PokeBot.CanUseAutoOT(poke) &&
                         cachedTradePartnerInfo != null)
                     {
                         next = await ApplyAutoOT(
@@ -1363,7 +1364,7 @@ public class PokeTradeBotPLZA(PokeTradeHub<PA9> Hub, PokeBotState Config) : Poke
             return result;
         }
 
-        if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT)
+        if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
         {
             toSend = await ApplyAutoOT(toSend, tradePartnerFullInfo, sav, token);
             // Give game time to refresh trade offer display with AutoOT Pokemon

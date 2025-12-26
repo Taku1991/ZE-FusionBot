@@ -29,7 +29,7 @@ namespace SysBot.Pokemon.Discord.Commands.Bots
                 }
 
                 var userId = client.CurrentUser?.Id ?? 0;
-                var data = new { uid = userId, v = TradeBot.Version };
+                var data = new { uid = userId, v = PokeBot.Version };
                 var json = JsonConvert.SerializeObject(data);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 

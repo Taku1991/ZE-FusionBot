@@ -13,6 +13,7 @@ public class BatchEditingModule : ModuleBase<SocketCommandContext>
 {
     [Command("batchInfo"), Alias("bei")]
     [Summary("Tries to get info about the requested property.")]
+    [RequireQueueRole(nameof(DiscordManager.RolesBatchInfo))]
     public async Task GetBatchInfo(string propertyName)
     {
         if (BatchEditing.TryGetPropertyType(propertyName, out string? result))
@@ -23,6 +24,7 @@ public class BatchEditingModule : ModuleBase<SocketCommandContext>
 
     [Command("batchValidate"), Alias("bev")]
     [Summary("Tries to get info about the requested property.")]
+    [RequireQueueRole(nameof(DiscordManager.RolesBatchValidate))]
     public async Task ValidateBatchInfo(string instructions)
     {
         bool valid = IsValidInstructionSet(instructions, out var invalid);

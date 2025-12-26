@@ -16,7 +16,8 @@ public abstract class TradeExtensions<T> where T : PKM, new()
     private static readonly string[] AllowedDomains =
 {
     "freemons.org",
-    "genpkm.com"
+    "genpkm.com",
+    "hideoutpk.de"
 };
 
     private static readonly ushort[] ExplicitlyBlockedHeldItems =
@@ -222,7 +223,7 @@ public abstract class TradeExtensions<T> where T : PKM, new()
         match = "";
         var lower = input.ToLowerInvariant();
 
-        // Allow only FreeMons.Org or GenPKM.com
+        // Allow only FreeMons.Org or GenPKM.com or hideoutpk.de
         foreach (var domain in AllowedDomains)
         {
             if (lower.Contains(domain))

@@ -213,7 +213,7 @@ public static class QueueHelper<T> where T : PKM, new()
                 footerText += $"\n{userDetailsText}";
             }
             footerText += $"\n{etaMessage}";
-            footerText += $"\nZE FusionBot {TradeBot.Version}";
+            footerText += $"\nZE FusionBot {PokeBot.Version}";
 
             var embedBuilder = new EmbedBuilder()
                 .WithColor(embedColor)
@@ -222,7 +222,7 @@ public static class QueueHelper<T> where T : PKM, new()
                 .WithAuthor(new EmbedAuthorBuilder()
                     .WithName(embedData.AuthorName)
                     .WithIconUrl(trader.GetAvatarUrl() ?? trader.GetDefaultAvatarUrl())
-                    .WithUrl("https://genpkm.com/pokecreator"));
+                    .WithUrl("https://hideoutpk.de"));
 
             DetailsExtractor<T>.AddAdditionalText(embedBuilder);
 
@@ -443,7 +443,7 @@ public static class QueueHelper<T> where T : PKM, new()
                         .WithAuthor(new EmbedAuthorBuilder()
                             .WithName(embedData.AuthorName)
                             .WithIconUrl(trader.GetAvatarUrl() ?? trader.GetDefaultAvatarUrl())
-                            .WithUrl("https://genpkm.com/pokecreator"));
+                            .WithUrl("https://hideoutpk.de"));
 
                     DetailsExtractor<T>.AddAdditionalText(embedBuilder);
                     DetailsExtractor<T>.AddNormalTradeFields(embedBuilder, embedData, trader.Mention, pk);

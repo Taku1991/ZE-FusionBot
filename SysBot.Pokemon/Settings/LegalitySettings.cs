@@ -14,7 +14,7 @@ public class LegalitySettings
 
     private const string Misc = nameof(Misc);
 
-    private string DefaultTrainerName = "FreeMons.Org";
+    private string DefaultTrainerName = "hideoutpk.de";
 
     [Category(Generate), Description("Allow users to submit further customization with Batch Editor commands.")]
     public bool AllowBatchCommands { get; set; } = true;

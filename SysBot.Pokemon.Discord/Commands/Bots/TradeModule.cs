@@ -192,6 +192,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
     [Command("egg")]
     [Alias("Egg")]
     [Summary("Trades an egg generated from the provided Pokémon name.")]
+    [RequireQueueRole(nameof(DiscordManager.RolesEgg))]
     public async Task TradeEgg([Remainder] string egg)
     {
         var userID = Context.User.Id;
@@ -202,7 +203,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
     [Command("egg")]
     [Alias("Egg")]
     [Summary("Trades an egg generated from the provided Pokémon name.")]
-    [RequireQueueRole(nameof(DiscordManager.RolesTrade))]
+    [RequireQueueRole(nameof(DiscordManager.RolesEgg))]
     public async Task TradeEggAsync([Summary("Trade Code")] int code, [Summary("Showdown Set")][Remainder] string content)
     {
         var userID = Context.User.Id;
@@ -750,6 +751,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
     [Command("textView")]
     [Alias("tv")]
     [Summary("View a specific Pokémon set from your pending TextTrade file by number.")]
+    [RequireQueueRole(nameof(DiscordManager.RolesTextView))]
     public async Task TextViewAsync([Remainder] string args = "")
     {
         ulong userId = Context.User.Id;
@@ -829,6 +831,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
     [Command("battlereadylist")]
     [Alias("brl")]
     [Summary("Lists available battle-ready files, filtered by a specific letter or substring, and sends the list via DM.")]
+    [RequireQueueRole(nameof(DiscordManager.RolesBattleReadyList))]
     public Task BattleReadyListAsync([Remainder] string args = "")
         => ListHelpers<T>.HandleListCommandAsync(
             Context,
@@ -845,7 +848,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
     [Command("eventrequest")]
     [Alias("er")]
     [Summary("Downloads event attachments from the specified EventsFolder and adds to trade queue.")]
-    [RequireQueueRole(nameof(DiscordManager.RolesTrade))]
+    [RequireQueueRole(nameof(DiscordManager.RolesEventRequest))]
     public Task EventRequestAsync(int index)
         => ListHelpers<T>.HandleRequestCommandAsync(
             Context,
@@ -858,7 +861,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
     [Command("battlereadyrequest")]
     [Alias("brr", "br")]
     [Summary("Downloads battle-ready attachments from the specified folder and adds to trade queue.")]
-    [RequireQueueRole(nameof(DiscordManager.RolesTrade))]
+    [RequireQueueRole(nameof(DiscordManager.RolesBattleReadyRequest))]
     public Task BattleReadyRequestAsync(int index)
         => ListHelpers<T>.HandleRequestCommandAsync(
             Context,
@@ -875,7 +878,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
     [Command("batchTrade")]
     [Alias("bt")]
     [Summary("Makes the bot trade multiple Pokémon from the provided list, up to a maximum of 4 trades.")]
-    [RequireQueueRole(nameof(DiscordManager.RolesTrade))]
+    [RequireQueueRole(nameof(DiscordManager.RolesBatchTrade))]
     public async Task BatchTradeAsync([Summary("List of Showdown Sets separated by '---'")][Remainder] string content)
     {
         var tradeConfig = SysCord<T>.Runner.Config.Trade.TradeConfiguration;
@@ -973,7 +976,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
     [Command("batchtradezip")]
     [Alias("btz", "batchzip", "ziptrade", "7z", "rar", "zip", "bt7", "btr", "batch7z", "batchrar")]
     [Summary("Upload a .zip/.rar/.7z containing PKM files to trade multiple Pokémon at once.")]
-    [RequireQueueRole(nameof(DiscordManager.RolesTrade))]
+    [RequireQueueRole(nameof(DiscordManager.RolesBatchTradeZip))]
     public async Task BatchTradeZipAsync()
     {
         var tradeConfig = SysCord<T>.Runner.Config.Trade.TradeConfiguration;

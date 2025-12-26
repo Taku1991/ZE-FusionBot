@@ -66,6 +66,9 @@ public class DiscordSettings
     [Category(Operation), Description("Additional text to add to the beginning of the embed description."), DisplayName("Additional Embed Text")]
     public string[] AdditionalEmbedText { get; set; } = [];
 
+    [Category(Channels), Description("Channels where AdditionalEmbedText will be shown. If empty, AdditionalEmbedText will be shown in all channels."), DisplayName("Additional Embed Text Channels")]
+    public RemoteControlAccessList AdditionalEmbedTextChannels { get; set; } = new();
+
     [Category(Users), Description("Disabling this will remove global sudo support."), DisplayName("Allow Global Sudo")]
     public bool AllowGlobalSudo { get; set; } = true;
 
@@ -144,19 +147,64 @@ public class DiscordSettings
     public bool DeleteUserCommandMessages { get; set; } = true;
 
     [Category(Roles), Description("Users with this role are allowed to enter the Clone queue."), DisplayName("Role can Clone")]
-    public RemoteControlAccessList RoleCanClone { get; set; } = new() { AllowIfEmpty = true };
+    public RemoteControlAccessList RoleCanClone { get; set; } = new() { AllowIfEmpty = false };
 
     [Category(Roles), Description("Users with this role are allowed to enter the Dump queue."), DisplayName("Role can Dump")]
     public RemoteControlAccessList RoleCanDump { get; set; } = new() { AllowIfEmpty = true };
 
     [Category(Roles), Description("Users with this role are allowed to enter the FixOT queue."), DisplayName("Role can FixOT")]
-    public RemoteControlAccessList RoleCanFixOT { get; set; } = new() { AllowIfEmpty = true };
+    public RemoteControlAccessList RoleCanFixOT { get; set; } = new() { AllowIfEmpty = false };
 
     [Category(Roles), Description("Users with this role are allowed to enter the Seed Check/Special Request queue."), DisplayName("Role can Seed/Special Request")]
     public RemoteControlAccessList RoleCanSeedCheckorSpecialRequest { get; set; } = new() { AllowIfEmpty = true };
 
     [Category(Roles), Description("Users with this role are allowed to enter the Trade queue."), DisplayName("Role can Trade")]
     public RemoteControlAccessList RoleCanTrade { get; set; } = new() { AllowIfEmpty = true };
+
+    [Category(Roles), Description("Users with this role are allowed to use AutoOT functionality."), DisplayName("Role can AutoOT")]
+    public RemoteControlAccessList RoleCanAutoOT { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the Egg command."), DisplayName("Role can Egg")]
+    public RemoteControlAccessList RoleCanEgg { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the BatchTrade command."), DisplayName("Role can BatchTrade")]
+    public RemoteControlAccessList RoleCanBatchTrade { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the MysteryEgg command."), DisplayName("Role can MysteryEgg")]
+    public RemoteControlAccessList RoleCanMysteryEgg { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the MysteryMon command."), DisplayName("Role can MysteryMon")]
+    public RemoteControlAccessList RoleCanMysteryMon { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the TextView command."), DisplayName("Role can TextView")]
+    public RemoteControlAccessList RoleCanTextView { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the EventRequest command."), DisplayName("Role can EventRequest")]
+    public RemoteControlAccessList RoleCanEventRequest { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the BattleReadyList command."), DisplayName("Role can BattleReadyList")]
+    public RemoteControlAccessList RoleCanBattleReadyList { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the BattleReadyRequest command."), DisplayName("Role can BattleReadyRequest")]
+    public RemoteControlAccessList RoleCanBattleReadyRequest { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the HomeReadyRequest command."), DisplayName("Role can HomeReadyRequest")]
+    public RemoteControlAccessList RoleCanHomeReadyRequest { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the BatchTradeZip command."), DisplayName("Role can BatchTradeZip")]
+    public RemoteControlAccessList RoleCanBatchTradeZip { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the BatchInfo command."), DisplayName("Role can BatchInfo")]
+    public RemoteControlAccessList RoleCanBatchInfo { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use the BatchValidate command."), DisplayName("Role can BatchValidate")]
+    public RemoteControlAccessList RoleCanBatchValidate { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to use Batch Commands in their Showdown sets."), DisplayName("Role can Batch Commands")]
+    public RemoteControlAccessList RoleCanUseBatchCommands { get; set; } = new() { AllowIfEmpty = false };
+
+    [Category(Roles), Description("Users with this role are allowed to override trainer data (OT, TID, SID, Gender) in their Showdown sets."), DisplayName("Role can Override Trainer Data")]
+    public RemoteControlAccessList RoleCanOverrideTrainerData { get; set; } = new() { AllowIfEmpty = true };
 
     [Category(Roles), Description("Users with this role are allowed to join the queue with a better position."), DisplayName("Favored Roles")]
     public RemoteControlAccessList RoleFavored { get; set; } = new() { AllowIfEmpty = false };

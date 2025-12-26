@@ -221,7 +221,7 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
         bool isMysteryGift = toSend.FatefulEncounter;
 
         // Check if Mystery Gift has legitimate preset OT/TID/SID (not PKHeX defaults)
-        bool hasDefaultTrainerInfo = toSend.OriginalTrainerName.Equals("FreeMons.Org", StringComparison.OrdinalIgnoreCase) &&
+        bool hasDefaultTrainerInfo = toSend.OriginalTrainerName.Equals("hideoutpk.de", StringComparison.OrdinalIgnoreCase) &&
                                     toSend.TID16 == 12345 &&
                                     toSend.SID16 == 54321;
 
@@ -949,7 +949,7 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
                 // Prepare the next Pokemon with AutoOT if needed
                 if (toSend.Species != 0)
                 {
-                    if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && cachedTradePartnerInfo != null)
+                    if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke) && cachedTradePartnerInfo != null)
                     {
                         toSend = await ApplyAutoOT(toSend, cachedTradePartnerInfo, sav, token);
                         tradesToProcess[currentTradeIndex] = toSend; // Update the list
@@ -1095,7 +1095,7 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
                 poke.SendNotification(this, $"Found Link Trade partner: {tradePartner.TrainerName}. **TID**: {tradePartner.TID7} **SID**: {tradePartner.SID7}");
 
                 // Apply AutoOT for first trade if needed
-                if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT)
+                if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
                 {
                     toSend = await ApplyAutoOT(toSend, tradePartnerFullInfo, sav, token).ConfigureAwait(false);
                     poke.TradeData = toSend;
@@ -1487,7 +1487,7 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
             await ExitTradeToPortal(false, token).ConfigureAwait(false);
             return result;
         }
-        if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT)
+        if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
         {
             toSend = await ApplyAutoOT(toSend, tradePartnerFullInfo, sav, token);
         }

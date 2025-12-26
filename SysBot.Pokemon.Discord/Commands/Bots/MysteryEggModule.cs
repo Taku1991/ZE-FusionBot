@@ -19,6 +19,7 @@ namespace SysBot.Pokemon.Discord
         [Command("mysteryegg")]
         [Alias("me")]
         [Summary("Trades an egg generated from a random Pokémon.")]
+        [RequireQueueRole(nameof(DiscordManager.RolesMysteryEgg))]
         public async Task TradeMysteryEggAsync()
         {
             // LGPE does not support eggs/breeding
@@ -53,6 +54,7 @@ namespace SysBot.Pokemon.Discord
         [Command("batchMysteryEgg")]
         [Alias("bme")]
         [Summary("Trades multiple Mystery Eggs at once (up to 4).")]
+        [RequireQueueRole(nameof(DiscordManager.RolesMysteryEgg))]
         public async Task BatchMysteryEggAsync([Summary("Number of eggs (1-4)")] int count = 2)
         {
             // LGPE does not support eggs/breeding
@@ -222,7 +224,7 @@ namespace SysBot.Pokemon.Discord
                 .WithAuthor(new EmbedAuthorBuilder()
                     .WithName($"Mystery Egg for {context.User.Username}")
                     .WithIconUrl(context.User.GetAvatarUrl() ?? context.User.GetDefaultAvatarUrl())
-                    .WithUrl("https://genpkm.com"));
+                    .WithUrl("https://hideoutpk.de"));
 
             return embedBuilder.Build();
         }

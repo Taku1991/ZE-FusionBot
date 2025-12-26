@@ -488,7 +488,7 @@ public static class WebApiExtensions
             "STATUS" => GetBotStatuses(botId),
             "ISREADY" => CheckReady(),
             "INFO" => GetInstanceInfo(),
-            "VERSION" => TradeBot.Version,
+            "VERSION" => PokeBot.Version,
             "UPDATE" => TriggerUpdate(),
             "SELFRESTARTALL" => TriggerSelfRestart(),
             "RESTARTSCHEDULE" => GetRestartSchedule(),
@@ -880,7 +880,7 @@ public static class WebApiExtensions
 
     private static string GetVersion()
     {
-        return TradeBot.Version;
+        return PokeBot.Version;
     }
 
     private static string GetInstanceName(ProgramConfig? config, string mode)

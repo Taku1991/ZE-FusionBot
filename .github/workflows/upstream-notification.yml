@@ -1,0 +1,46 @@
+name: Upstream Update Notification
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Runs every 6 hours
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Check for Upstream Updates
+        id: check-updates
+        run: |
+          git remote add upstream https://github.com/bdawg1989/PokeBot.git
+          git fetch upstream
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          UPSTREAM_COMMIT=$(git rev-parse upstream/main)
+
+          # Check if upstream/main has new commits not in our fork
+          if [ "$CURRENT_COMMIT" != "$UPSTREAM_COMMIT" ] && git log HEAD..upstream/main | grep -q ''; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "upstream_commit=$(git rev-parse upstream/main)" >> $GITHUB_OUTPUT
+            # Only use first line of commit message and sanitize
+            COMMIT_MSG=$(git log -1 --pretty=%s upstream/main | tr -d '\n\r' | sed 's/"/\\"/g')
+            echo "upstream_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Discord Notification
+        if: steps.check-updates.outputs.has_updates == 'true'
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: |
+            🔔 New Upstream Update Available!
+            Commit Message: ${{ steps.check-updates.outputs.upstream_message }}
+            Commit Hash: ${{ steps.check-updates.outputs.upstream_commit }}
+            Commit Link: https://github.com/bdawg1989/PokeBot/commit/${{ steps.check-updates.outputs.upstream_commit }}

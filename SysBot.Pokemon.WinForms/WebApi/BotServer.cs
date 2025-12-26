@@ -904,7 +904,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
         var mode = config?.Mode.ToString() ?? "Unknown";
         var name = config?.Hub?.BotName ?? "ZE_FusionBot";
 
-        var version = SysBot.Pokemon.Helpers.TradeBot.Version;
+        var version = SysBot.Pokemon.PokeBot.Version;
 
         var botStatuses = controllers.Select(c => new BotStatusInfo
         {
@@ -1699,7 +1699,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
             if (currentState != null)
             {
                 // Check if master instance actually updated
-                var currentVersion = SysBot.Pokemon.Helpers.TradeBot.Version;
+                var currentVersion = SysBot.Pokemon.PokeBot.Version;
                 LogUtil.LogInfo($"Checking session state: current={currentVersion}, target={currentState.TargetVersion}, isComplete={currentState.IsComplete}", "WebServer");
                 
                 // If version matches target, force complete regardless of what the state says

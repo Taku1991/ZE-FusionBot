@@ -28,6 +28,36 @@ public class DiscordManager(DiscordSettings Config)
 
     public RemoteControlAccessList RolesTrade => Config.RoleCanTrade;
 
+    public RemoteControlAccessList RolesEgg => Config.RoleCanEgg;
+
+    public RemoteControlAccessList RolesBatchTrade => Config.RoleCanBatchTrade;
+
+    public RemoteControlAccessList RolesMysteryEgg => Config.RoleCanMysteryEgg;
+
+    public RemoteControlAccessList RolesMysteryMon => Config.RoleCanMysteryMon;
+
+    public RemoteControlAccessList RolesTextView => Config.RoleCanTextView;
+
+    public RemoteControlAccessList RolesEventRequest => Config.RoleCanEventRequest;
+
+    public RemoteControlAccessList RolesBattleReadyList => Config.RoleCanBattleReadyList;
+
+    public RemoteControlAccessList RolesBattleReadyRequest => Config.RoleCanBattleReadyRequest;
+
+    public RemoteControlAccessList RolesHomeReadyRequest => Config.RoleCanHomeReadyRequest;
+
+    public RemoteControlAccessList RolesBatchTradeZip => Config.RoleCanBatchTradeZip;
+
+    public RemoteControlAccessList RolesBatchInfo => Config.RoleCanBatchInfo;
+
+    public RemoteControlAccessList RolesBatchValidate => Config.RoleCanBatchValidate;
+
+    public RemoteControlAccessList RolesAutoOT => Config.RoleCanAutoOT;
+
+    public RemoteControlAccessList RolesUseBatchCommands => Config.RoleCanUseBatchCommands;
+
+    public RemoteControlAccessList RolesOverrideTrainerData => Config.RoleCanOverrideTrainerData;
+
     public RemoteControlAccessList SudoDiscord => Config.GlobalSudoList;
 
     public RemoteControlAccessList SudoRoles => Config.RoleSudo;
@@ -69,6 +99,21 @@ public class DiscordManager(DiscordSettings Config)
         nameof(RolesDump) => RolesDump,
         nameof(RolesFixOT) => RolesFixOT,
         nameof(RolesRemoteControl) => RolesRemoteControl,
+        nameof(RolesEgg) => RolesEgg,
+        nameof(RolesBatchTrade) => RolesBatchTrade,
+        nameof(RolesMysteryEgg) => RolesMysteryEgg,
+        nameof(RolesMysteryMon) => RolesMysteryMon,
+        nameof(RolesTextView) => RolesTextView,
+        nameof(RolesEventRequest) => RolesEventRequest,
+        nameof(RolesBattleReadyList) => RolesBattleReadyList,
+        nameof(RolesBattleReadyRequest) => RolesBattleReadyRequest,
+        nameof(RolesHomeReadyRequest) => RolesHomeReadyRequest,
+        nameof(RolesBatchTradeZip) => RolesBatchTradeZip,
+        nameof(RolesBatchInfo) => RolesBatchInfo,
+        nameof(RolesBatchValidate) => RolesBatchValidate,
+        nameof(RolesAutoOT) => RolesAutoOT,
+        nameof(RolesUseBatchCommands) => RolesUseBatchCommands,
+        nameof(RolesOverrideTrainerData) => RolesOverrideTrainerData,
         _ => throw new ArgumentOutOfRangeException(nameof(type)),
     };
 }

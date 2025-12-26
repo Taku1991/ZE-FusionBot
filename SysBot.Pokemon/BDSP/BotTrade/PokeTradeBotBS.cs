@@ -246,7 +246,7 @@ public class PokeTradeBotBS : PokeRoutineExecutor8BS, ICountBot, ITradeBot, IDis
         bool isMysteryGift = toSend.FatefulEncounter;
 
         // Check if Mystery Gift has legitimate preset OT/TID/SID (not PKHeX defaults)
-        bool hasDefaultTrainerInfo = toSend.OriginalTrainerName.Equals("FreeMons.Org", StringComparison.OrdinalIgnoreCase) &&
+        bool hasDefaultTrainerInfo = toSend.OriginalTrainerName.Equals("hideoutpk.de", StringComparison.OrdinalIgnoreCase) &&
                                     toSend.TID16 == 12345 &&
                                     toSend.SID16 == 54321;
 
@@ -1022,7 +1022,7 @@ public class PokeTradeBotBS : PokeRoutineExecutor8BS, ICountBot, ITradeBot, IDis
         if (partnerCheck != PokeTradeResult.Success)
             return PokeTradeResult.SuspiciousActivity;
 
-        if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT)
+        if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
         {
             toSend = await ApplyAutoOT(toSend, sav, tradePartner?.TrainerName ?? string.Empty, (uint)tid, (uint)sid, token);
         }
@@ -1282,7 +1282,7 @@ public class PokeTradeBotBS : PokeRoutineExecutor8BS, ICountBot, ITradeBot, IDis
                 // Prepare the next Pokemon with AutoOT if needed
                 if (toSend.Species != 0)
                 {
-                    if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && cachedTradePartner != null)
+                    if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke) && cachedTradePartner != null)
                     {
                         toSend = await ApplyAutoOT(toSend, sav, cachedTradePartner.TrainerName, cachedTID, cachedSID, token);
                         tradesToProcess[currentTradeIndex] = toSend; // Update the list
@@ -1422,7 +1422,7 @@ public class PokeTradeBotBS : PokeRoutineExecutor8BS, ICountBot, ITradeBot, IDis
             }
 
             // Apply AutoOT for first trade if needed (already done for subsequent trades above)
-            if (currentTradeIndex == 0 && Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT)
+            if (currentTradeIndex == 0 && Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
             {
                 toSend = await ApplyAutoOT(toSend, sav, tradePartner?.TrainerName ?? string.Empty, (uint)tid, (uint)sid, token);
                 poke.TradeData = toSend;

@@ -365,7 +365,7 @@ public class OwnerModule<T> : SudoModule<T> where T : PKM, new()
     {
         try
         {
-            var jsonData = File.ReadAllText(TradeBot.ConfigPath);
+            var jsonData = File.ReadAllText(PokeBot.ConfigPath);
             var config = JObject.Parse(jsonData);
 
             var botsArray = config["Bots"] as JArray;

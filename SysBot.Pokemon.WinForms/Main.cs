@@ -288,7 +288,7 @@ namespace SysBot.Pokemon.WinForms
             }
             // Load other form shit and/or save valuable shit to config
             LoadControls();
-            Text = $"{(string.IsNullOrEmpty(Config.Hub.BotName) ? "ZE FusionBot |" : Config.Hub.BotName)} {TradeBot.Version} | Mode: {Config.Mode}";
+            Text = $"{(string.IsNullOrEmpty(Config.Hub.BotName) ? "ZE FusionBot |" : Config.Hub.BotName)} {PokeBot.Version} | Mode: {Config.Mode}";
             UpdateBackgroundImage(Config.Mode);        // Call the method to update image in leftSidePanel
             UpdateUpperImage(Config.Mode);        // Call the method to update image in panelTitleBar
             LoadThemeOptions();

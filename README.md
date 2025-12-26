@@ -7,22 +7,22 @@
     </a>
 </h1>
 
-> ⚠️ **Font Notice:** If the program's fonts are not displaying properly for you, download them [here](https://github.com/Secludedly/ZE-FusionBot/tree/main/SysBot.Pokemon.WinForms/Fonts) and install them on your machine.
+> ⚠️ **Font Notice:** If the program's fonts are not displaying properly for you, download them [here](https://github.com/Taku1991/ZE-FusionBot/tree/main/SysBot.Pokemon.WinForms/Fonts) and install them on your machine.
 
 <p align="center">
   <i>A community-driven and inspired SysBot.NET project with the most beautiful GUI that unites code from everyone, supporting LGPE, SWSH, BDSP, PLA, SV, and PLZA!</i>
 </p>
 <h2 align="center">
-  Visit <a href="https://FreeMons.Org">FreeMons.Org</a> to join Zeraora's Emporium!
+  Join our community at <a href="https://discord.gg/pokemonhideout">Pokemon Hideout</a>!
 </h2>
 <p align="center">
-    <img src="https://visitor-badge.laobi.icu/badge?page_id=Secludedly.ZE-FusionBot" alt="Visitors">
+    <img src="https://visitor-badge.laobi.icu/badge?page_id=Taku1991.ZE-FusionBot" alt="Visitors">
 </p>
 <h4 align="center">
-  <a href="https://FreeMons.Org">
+  <a href="https://discord.gg/pokemonhideout">
     <img src="https://i.imgur.com/wbWzI2u.png" alt="discord" style="height: 20px;">
   </a>
-  <a href="https://ko-fi.com/secludedly">
+  <a href="https://ko-fi.com/pokemonhideout">
     <img src="https://i.imgur.com/nDO4SgL.png" alt="ko-fi" style="height: 20px;">
   </a>
 </h4>
@@ -31,7 +31,7 @@
 
 ## 🚀 Introduction
 
-`ZE FusionBot` is a powerful and open-source SysBot.NET fork, initially tailored for the Discord server [Zeraora's Emporium](https://FreeMons.Org). While originally built for internal server use, it has transformed into a beautiful, community-powered GUI with dozens of integrated forks and unique enhancements, catering to every Nintendo Switch Pokémon game.
+`ZE FusionBot` is a powerful and open-source SysBot.NET fork, forked from [Secludedly's ZE FusionBot](https://github.com/Secludedly/ZE-FusionBot) and customized for the [Pokemon Hideout](https://discord.gg/pokemonhideout) community. It features a beautiful, community-powered GUI with dozens of integrated forks and unique enhancements, catering to every Nintendo Switch Pokémon game.
 
 ---
 
@@ -69,22 +69,22 @@
     <img src="https://i.imgur.com/VZ2oeOy.gif" style="max-width: 100%; height: auto;">
 </p>
 <p align="center">
-    <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_GeneralOverlook2.gif" style="max-width: 100%; height: auto;">
+    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_GeneralOverlook2.gif" style="max-width: 100%; height: auto;">
 </p>
 <p align="center">
-    <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_Environment2.gif" style="max-width: 100%; height: auto;">
+    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Environment2.gif" style="max-width: 100%; height: auto;">
 </p>
 <p align="center">
-    <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_Reload2.gif" style="max-width: 100%; height: auto;">
+    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Reload2.gif" style="max-width: 100%; height: auto;">
 </p>
 <p align="center">
-    <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_Themes2.gif" style="max-width: 100%; height: auto;">
+    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Themes2.gif" style="max-width: 100%; height: auto;">
 </p>
 <p align="center">
-    <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_Starting2.gif" style="max-width: 100%; height: auto;">
+    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Starting2.gif" style="max-width: 100%; height: auto;">
 </p>
 <p align="center">
-    <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_Update2.gif" style="max-width: 100%; height: auto;">
+    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Update2.gif" style="max-width: 100%; height: auto;">
 </p>
 
 ---
@@ -101,11 +101,11 @@
   <tr>
     <td align="center" width="50%">
       <strong>Switch Remote for PC</strong><br />
-      <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_SwitchRemoteForPC.gif" alt="Switch Remote for PC" width="100%" />
+      <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_SwitchRemoteForPC.gif" alt="Switch Remote for PC" width="100%" />
     </td>
     <td align="center" width="50%">
       <strong>SysDVR</strong><br />
-      <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_SysDVR.gif" alt="SysDVR" width="100%" />
+      <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_SysDVR.gif" alt="SysDVR" width="100%" />
     </td>
   </tr>
 
@@ -113,11 +113,11 @@
   <tr>
     <td align="center" width="50%">
       <strong>Batch Trading Archives</strong><br />
-      <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_BatchArchive.gif" alt="Batch Trading Archives" width="100%" />
+      <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_BatchArchive.gif" alt="Batch Trading Archives" width="100%" />
     </td>
     <td align="center" width="50%">
       <strong>Batch Trading Showdown</strong><br />
-      <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_BatchShowdown.gif" alt="Batch Trading Showdown" width="100%" />
+      <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_BatchShowdown.gif" alt="Batch Trading Showdown" width="100%" />
     </td>
   </tr>
 
@@ -125,11 +125,11 @@
   <tr>
     <td align="center" width="50%">
       <strong>Peek & Video Feature</strong><br />
-      <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_Peek+Video.gif" alt="Peek & Video Feature" width="100%" />
+      <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Peek+Video.gif" alt="Peek & Video Feature" width="100%" />
     </td>
     <td align="center" width="50%">
       <strong>Mystery Mon</strong><br />
-      <img src="https://raw.githubusercontent.com/Secludedly/ZE-FusionBot/main/.readme/README_MysteryMon.gif" alt="Mystery Mon" width="100%" />
+      <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_MysteryMon.gif" alt="Mystery Mon" width="100%" />
     </td>
   </tr>
 </table>
@@ -181,12 +181,12 @@
 | `trade true` | t true | Trade a Pokémon from a PKM file, without AutoOT | `trade true <upload pkm>` | Everyone |
 | `tradeUser` | tu, tradeOther | Trade the mentioned user the attached file. | `tradeuser @user` | Everyone |
 | `hidetrade` | ht | Same as trade, but hides the embed. | `hidetrade <Showdown Format>` | Everyone |
-| `clone` | c | Clone the Pokémon you show via Link Trade. | `clone` | Everyone |
+| `clone` | c | Clone the Pokémon you show via Link Trade. | `clone` | **Premium** 🌟 |
 | `dump` | d | Dump the Pokémon you show via Link Trade. | `dump` | Everyone |
-| `egg` | Egg | Trade an egg via provided Pokémon set. | `egg <Showdown Format>` | Everyone |
+| `egg` | Egg | Trade an egg via provided Pokémon set. | `egg <Showdown Format>` | **Premium** 🌟 |
 | `seed` | checkMySeed, checkSeed, seedCheck, s, sc | Check a Pokémon seed. | `seedCheck` | Everyone |
 | `itemTrade` | it, item | Trade a Pokémon holding a requested item. | `it <Leftovers>` | Everyone |
-| `fixOT` | fix, f | Fix OT and Nickname of a Pokémon if an advert is detected. | `fixOT` | Everyone |
+| `fixOT` | fix, f | Fix OT and Nickname of a Pokémon if an advert is detected. | `fixOT` | **Premium** 🌟 |
 | `convert` | showdown | Convert a Showdown Set to RegenTemplate. | `convert <set>` | Everyone |
 | `legalize` | alm | Attempt to legalize PKM data. | `legalize <pkm>` | Everyone |
 | `validate` | lc, check, verify | Verify PKM legality. | `validate <pkm>` | Everyone |
@@ -200,18 +200,18 @@
 | Command | Aliases | Summary | Example | Permission |
 |---------|---------|---------|---------|------------|
 | `textTrade` | tt, text | Upload a .txt/.csv of Showdown sets for batch trading. | `tt <upload .txt/.csv file>` | Everyone |
-| `textView` | tv | View a specific Pokémon from your pending TextTrade file. | `tv 2` | Everyone |
+| `textView` | tv | View a specific Pokémon from your pending TextTrade file. | `tv 2` | **Premium** 🌟 |
 | `listEvents` | le | Lists available event files via DM. | `le <species> <page2>` | Everyone |
-| `eventRequest` | er | Downloads event attachments and adds to trade queue. | `eventRequest <file>` | Everyone |
-| `battleReadyList` | brl | Lists available battle-ready files via DM. | `brl <species> <page2>` | Everyone |
-| `battleReadyRequest` | br, brr | Downloads battle-ready attachments and adds to trade queue. | `battleReadyRequest <file>` | Everyone |
+| `eventRequest` | er | Downloads event attachments and adds to trade queue. | `eventRequest <file>` | **Premium** 🌟 |
+| `battleReadyList` | brl | Lists available battle-ready files via DM. | `brl <species> <page2>` | **Premium** 🌟 |
+| `battleReadyRequest` | br, brr | Downloads battle-ready attachments and adds to trade queue. | `battleReadyRequest <file>` | **Premium** 🌟 |
 | `pokepaste` | pp, Pokepaste, PP | Generates a team from a PokePaste URL. | `pp <URL>` | Everyone |
 | `dittoTrade` | dt, ditto | Trade a Ditto with requested stats, language, and nature. | `dt <LinkCode> <IVToBe0> <Lang> <Nature>` | Everyone |
-| `mysteryegg` | me | Get a random shiny 6IV egg. | `mysteryegg` | Everyone |
-| `mysterymon` | mm, mystery, surprise | Get a fully random Pokémon. | `mysterymon` | Everyone |
+| `mysteryegg` | me | Get a random shiny 6IV egg. | `mysteryegg` | **Premium** 🌟 |
+| `mysterymon` | mm, mystery, surprise | Get a fully random Pokémon. | `mysterymon` | **Premium** 🌟 |
 | `randomTeam` | rt, RandomTeam, Rt | Generates a random team. | `randomTeam` | Everyone |
 | `homeReady` | hr | Displays instructions for HOME-ready trading. | `homeReady` | Everyone |
-| `homeReadyRequest` | hrr | Downloads HOME-ready files and adds to trade queue. | `homeReadyRequest <number>` | Everyone |
+| `homeReadyRequest` | hrr | Downloads HOME-ready files and adds to trade queue. | `homeReadyRequest <number>` | **Premium** 🌟 |
 | `homeReadylist` | hrl | Lists available HOME-ready files. | `homeReadylist` | Everyone |
 | `specialRequest` | sr, srp | Lists Wondercard events or requests specific ones. | `srp <game> <page2>` | Everyone |
 | `getEvent` | ge, gep | Downloads the requested event as a PKM file. | `getEvent <eventID>` | Everyone |
@@ -220,10 +220,10 @@
 
 | Command | Aliases | Summary | Example | Permission |
 |---------|---------|---------|---------|------------|
-| `batchTrade` | bt | Trade multiple Pokémon (max 6) from a list. | `bt <Set1> --- <Set2>` | Everyone |
-| `batchTradeZip` | btz | Trade multiple Pokémon from a ZIP file. | `btz <file.zip>` | Everyone |
-| `batchInfo` | bei | Get info about a batch property. | `batchInfo <prop>` | Everyone |
-| `batchValidate` | bev | Validate a batch property. | `batchValidate <prop>` | Everyone |
+| `batchTrade` | bt | Trade multiple Pokémon (max 6) from a list. | `bt <Set1> --- <Set2>` | **Premium** 🌟 |
+| `batchTradeZip` | btz | Trade multiple Pokémon from a ZIP file. | `btz <file.zip>` | **Premium** 🌟 |
+| `batchInfo` | bei | Get info about a batch property. | `batchInfo <prop>` | **Premium** 🌟 |
+| `batchValidate` | bev | Validate a batch property. | `batchValidate <prop>` | **Premium** 🌟 |
 
 ## 📊 Queue Management
 
@@ -481,4 +481,4 @@ You can now read the DMs a user sends to the bot. This is fun for when people th
 
 ## 🤝 Supported Projects
 
-- [**GenPKM**](https://genpkm.com/pokecreator.php) — Web-based alternative to Showdown for bot-ready sets.
+- [**HideoutPK**](https://hideoutpk.de) — Pokemon trading community and resources.

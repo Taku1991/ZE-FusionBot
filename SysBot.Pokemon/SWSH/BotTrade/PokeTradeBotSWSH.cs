@@ -401,7 +401,7 @@ public class PokeTradeBotSWSH(PokeTradeHub<PK8> hub, PokeBotState config) : Poke
             poke.Notifier.UpdateBatchProgress(currentTradeIndex + 1, toSend, poke.UniqueTradeID);
 
             // Apply AutoOT if needed
-            if (hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT)
+            if (hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
             {
                 toSend = await ApplyAutoOT(toSend, trainerName, sav, token);
                 tradesToProcess[currentTradeIndex] = toSend;
@@ -814,7 +814,7 @@ public class PokeTradeBotSWSH(PokeTradeHub<PK8> hub, PokeBotState config) : Poke
             return PokeTradeResult.RecoverOpenBox;
         }
 
-        if (hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT)
+        if (hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
         {
             toSend = await ApplyAutoOT(toSend, trainerName, sav, token);
         }
@@ -1687,7 +1687,7 @@ public class PokeTradeBotSWSH(PokeTradeHub<PK8> hub, PokeBotState config) : Poke
         bool isMysteryGift = toSend.FatefulEncounter;
 
         // Check if Mystery Gift has legitimate preset OT/TID/SID (not PKHeX defaults)
-        bool hasDefaultTrainerInfo = toSend.OriginalTrainerName.Equals("FreeMons.Org", StringComparison.OrdinalIgnoreCase) &&
+        bool hasDefaultTrainerInfo = toSend.OriginalTrainerName.Equals("hideoutpk.de", StringComparison.OrdinalIgnoreCase) &&
                                     toSend.TID16 == 12345 &&
                                     toSend.SID16 == 54321;
 

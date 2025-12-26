@@ -1406,7 +1406,7 @@ public static class UpdateManager
     {
         try
         {
-            return TradeBot.Version;
+            return PokeBot.Version;
         }
         catch
         {
