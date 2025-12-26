@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: write
+
 jobs:
   version-check:
     runs-on: ubuntu-latest
@@ -25,15 +28,18 @@ jobs:
       - name: Compare Versions
         id: compare_versions
         run: |
-          LAST_VERSION=${{ secrets.LAST_KNOWN_VERSION }}
           CURRENT_VERSION=${{ env.CURRENT_VERSION }}
-          echo "Last known version: $LAST_VERSION"
+          # Get the latest tag from git
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "Last tag: $LAST_TAG"
           echo "Current version: $CURRENT_VERSION"
-          if [ "$CURRENT_VERSION" == "$LAST_VERSION" ]; then
-            echo "No version change detected."
+
+          # Check if tag exists for current version
+          if git rev-parse "$CURRENT_VERSION" >/dev/null 2>&1; then
+            echo "Tag $CURRENT_VERSION already exists, no new release needed."
             echo "version_changed=false" >> $GITHUB_OUTPUT
           else
-            echo "Version change detected."
+            echo "Tag $CURRENT_VERSION does not exist, creating new release."
             echo "version_changed=true" >> $GITHUB_OUTPUT
           fi
 
@@ -84,12 +90,18 @@ jobs:
       - name: Get Recent Changes
         id: recent_changes
         run: |
-          LAST_VERSION=${{ secrets.LAST_KNOWN_VERSION }}
-          if [ -z "$LAST_VERSION" ] || ! git rev-parse "$LAST_VERSION" >/dev/null 2>&1; then
-            echo "LAST_VERSION is not set or not found, using initial commit"
-            LAST_VERSION=$(git rev-list --max-parents=0 HEAD)
+          # Get the latest tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous tags found, using initial commit"
+            LAST_REF=$(git rev-list --max-parents=0 HEAD)
+          else
+            echo "Using last tag: $LAST_TAG"
+            LAST_REF=$LAST_TAG
           fi
-          RECENT_CHANGES=$(git log --pretty=format:"- %s" $LAST_VERSION..HEAD)
+
+          RECENT_CHANGES=$(git log --pretty=format:"- %s" $LAST_REF..HEAD)
           echo "RECENT_CHANGES<<EOF" >> $GITHUB_ENV
           echo "$RECENT_CHANGES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
@@ -98,33 +110,21 @@ jobs:
         with:
           name: ZEFusionBot
           path: ./publish
+      - name: Zip artifacts
+        run: |
+          cd ./publish
+          zip -r ../ZEFusionBot-${{ env.CURRENT_VERSION }}.zip .
+          cd ..
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN_FUSION }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.CURRENT_VERSION }}
-          release_name: Release ${{ env.CURRENT_VERSION }}
+          name: Release ${{ env.CURRENT_VERSION }}
           body: |
             ## Recent Changes
             ${{ env.RECENT_CHANGES }}
+          files: ZEFusionBot-${{ env.CURRENT_VERSION }}.zip
           draft: false
           prerelease: false
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN_FUSION }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./publish/SysBot.Pokemon.WinForms.exe
-          asset_name: ZEFusionBot.exe
-          asset_content_type: application/octet-stream
-      - name: Update Last Known Version
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN_FUSION }}
-        run: |
-          gh secret set LAST_KNOWN_VERSION -b"${{ env.CURRENT_VERSION }}"
-          echo "LAST_KNOWN_VERSION updated to $CURRENT_VERSION"
