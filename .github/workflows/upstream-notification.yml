@@ -17,7 +17,7 @@ jobs:
       - name: Check for Upstream Updates
         id: check-updates
         run: |
-          git remote add upstream https://github.com/bdawg1989/PokeBot.git
+          git remote add upstream https://github.com/Secludedly/ZE-FusionBot.git
           git fetch upstream
           CURRENT_COMMIT=$(git rev-parse HEAD)
           UPSTREAM_COMMIT=$(git rev-parse upstream/main)
@@ -43,4 +43,4 @@ jobs:
             🔔 New Upstream Update Available!
             Commit Message: ${{ steps.check-updates.outputs.upstream_message }}
             Commit Hash: ${{ steps.check-updates.outputs.upstream_commit }}
-            Commit Link: https://github.com/bdawg1989/PokeBot/commit/${{ steps.check-updates.outputs.upstream_commit }}
+            Commit Link: https://github.com/Secludedly/ZE-FusionBot/commit/${{ steps.check-updates.outputs.upstream_commit }}
