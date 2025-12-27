@@ -22,11 +22,11 @@ namespace SysBot.Pokemon.Discord
         [RequireQueueRole(nameof(DiscordManager.RolesMysteryEgg))]
         public async Task TradeMysteryEggAsync()
         {
-            // LGPE does not support eggs/breeding
+            // LGPE, PLA, PLZA does not support eggs/breeding
             var context = GetContext();
             if (context == EntityContext.None || typeof(T).Name == "PB7")
             {
-                await ReplyAsync("Mystery Eggs are not available for Let's Go Pikachu/Eevee as the game does not support breeding.").ConfigureAwait(false);
+                await ReplyAsync("Mystery Eggs are not available for Let's Go Pikachu/Eevee | Pokémon Legends: Arceus | Pokémon Legends: ZA as the game does not support breeding.").ConfigureAwait(false);
                 return;
             }
 
