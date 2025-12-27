@@ -10,7 +10,7 @@ namespace SysBot.Pokemon.WinForms
 {
     public class UpdateChecker
     {
-        private const string RepositoryOwner = "Secludedly";
+        private const string RepositoryOwner = "Taku1991";
         private const string RepositoryName = "ZE-FusionBot";
 
         // Reuse HttpClient for better performance and socket management
