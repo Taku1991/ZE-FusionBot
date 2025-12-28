@@ -122,7 +122,7 @@ public static class Helpers<T> where T : PKM, new()
         }
     }
 
-    public static Task<ProcessedPokemonResult<T>> ProcessShowdownSetAsync(string content, bool ignoreAutoOT = false)
+    public static Task<ProcessedPokemonResult<T>> ProcessShowdownSetAsync(string content, bool ignoreAutoOT = false, bool hasAutoOTPermission = true)
     {
         bool isEgg = TradeExtensions<T>.IsEggCheck(content);
 
@@ -226,7 +226,10 @@ public static class Helpers<T> where T : PKM, new()
         }
 
         // Final preparation
-        PrepareForTrade(pk, set, finalLanguage);
+        // Only allow custom trainer data if user has AutoOT permission
+        bool applyCustomTrainerData = hasAutoOTPermission &&
+            (!string.IsNullOrWhiteSpace(set.OT) || set.TID >= 0 || set.SID >= 0 || !string.IsNullOrWhiteSpace(set.OTGender));
+        PrepareForTrade(pk, set, finalLanguage, applyCustomTrainerData);
 
         // Check for spam names
         if (Info.Hub.Config.Trade.TradeConfiguration.EnableSpamCheck)
@@ -264,7 +267,7 @@ public static class Helpers<T> where T : PKM, new()
         };
     }
 
-    public static void PrepareForTrade(T pk, ShowdownSet set, byte finalLanguage)
+    public static void PrepareForTrade(T pk, ShowdownSet set, byte finalLanguage, bool applyCustomTrainerData = false)
     {
         // Only set EggMetDate for hatched Pokemon, not for unhatched eggs
         if (pk.WasEgg && !pk.IsEgg)
@@ -274,6 +277,40 @@ public static class Helpers<T> where T : PKM, new()
 
         if (!set.Nickname.Equals(pk.Nickname) && string.IsNullOrEmpty(set.Nickname))
             _ = pk.ClearNickname();
+
+        // Apply user-specified trainer data from ShowdownSet ONLY if user has permission
+        if (applyCustomTrainerData)
+        {
+            bool trainerDataModified = false;
+
+            if (!string.IsNullOrWhiteSpace(set.OT))
+            {
+                pk.OriginalTrainerName = set.OT;
+                trainerDataModified = true;
+            }
+
+            if (set.TID >= 0 && set.SID >= 0)
+            {
+                pk.TrainerTID7 = (uint)set.TID;
+                pk.TrainerSID7 = (uint)set.SID;
+                trainerDataModified = true;
+            }
+
+            if (set.OTGender != null && set.OTGender.Length > 0)
+            {
+                pk.OriginalTrainerGender = set.OTGender.ToLowerInvariant() switch
+                {
+                    "male" or "m" => 0,
+                    "female" or "f" => 1,
+                    _ => pk.OriginalTrainerGender
+                };
+                trainerDataModified = true;
+            }
+
+            // Refresh checksum if trainer data was modified
+            if (trainerDataModified)
+                pk.RefreshChecksum();
+        }
 
         pk.ResetPartyStats();
     }
@@ -498,5 +535,34 @@ public static class Helpers<T> where T : PKM, new()
         await QueueHelper<T>.AddToQueueAsync(context, code, trainerName, sig, pk!, PokeRoutineType.LinkTrade,
             tradeType, usr, isBatchTrade, batchTradeNumber, totalBatchTrades, isHiddenTrade, isMysteryEgg,
             lgcode: lgcode, ignoreAutoOT: ignoreAutoOT, setEdited: setEdited, isNonNative: isNonNative).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Removes trainer-related batch commands from content if user doesn't have AutoOT permission
+    /// </summary>
+    public static string StripTrainerBatchCommands(string content)
+    {
+        var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
+        var filteredLines = new List<string>();
+
+        foreach (var line in lines)
+        {
+            var trimmedLine = line.Trim();
+
+            // Skip lines that contain trainer-related batch commands
+            if (trimmedLine.StartsWith(".OriginalTrainerName=", StringComparison.OrdinalIgnoreCase) ||
+                trimmedLine.StartsWith(".TrainerTID7=", StringComparison.OrdinalIgnoreCase) ||
+                trimmedLine.StartsWith(".TrainerSID7=", StringComparison.OrdinalIgnoreCase) ||
+                trimmedLine.StartsWith(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase) ||
+                trimmedLine.StartsWith(".TID16=", StringComparison.OrdinalIgnoreCase) ||
+                trimmedLine.StartsWith(".SID16=", StringComparison.OrdinalIgnoreCase))
+            {
+                continue; // Skip this line
+            }
+
+            filteredLines.Add(line);
+        }
+
+        return string.Join(Environment.NewLine, filteredLines);
     }
 }

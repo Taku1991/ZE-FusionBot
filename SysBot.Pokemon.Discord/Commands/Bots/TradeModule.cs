@@ -672,6 +672,14 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
 
         var processingMessage = await ReplyAsync($"{user.Mention} Processing your text trade with {selections.Count} Pokémon...");
 
+        // Check if user has AutoOT permission
+        bool hasAutoOTPermission = true;
+        if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
+        {
+            var roles = gUser.Roles.Select(z => z.Name);
+            hasAutoOTPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
+        }
+
         // Process as batch trade using the batch system
         _ = Task.Run(async () =>
         {
@@ -687,7 +695,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                     tradeContent = ReusableActions.StripCodeBlock(tradeContent);
                     tradeContent = BatchCommandNormalizer.NormalizeBatchCommands(tradeContent);
 
-                    var (pk, error, set, legalizationHint) = await BatchHelpers<T>.ProcessSingleTradeForBatch(tradeContent);
+                    var (pk, error, set, legalizationHint) = await BatchHelpers<T>.ProcessSingleTradeForBatch(tradeContent, hasAutoOTPermission);
 
                     if (pk != null)
                     {
@@ -914,6 +922,14 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
 
         var processingMessage = await Context.Channel.SendMessageAsync($"{Context.User.Mention} Processing your batch trade with {trades.Count} Pokémon...");
 
+        // Check if user has AutoOT permission
+        bool hasAutoOTPermission = true;
+        if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
+        {
+            var roles = gUser.Roles.Select(z => z.Name);
+            hasAutoOTPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
+        }
+
         _ = Task.Run(async () =>
         {
             try
@@ -922,7 +938,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                 var errors = new List<BatchTradeError>();
                 for (int i = 0; i < trades.Count; i++)
                 {
-                    var (pk, error, set, legalizationHint) = await BatchHelpers<T>.ProcessSingleTradeForBatch(trades[i]);
+                    var (pk, error, set, legalizationHint) = await BatchHelpers<T>.ProcessSingleTradeForBatch(trades[i], hasAutoOTPermission);
                     if (pk != null)
                     {
                         batchPokemonList.Add(pk);
@@ -1230,14 +1246,33 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                 content = ReusableActions.StripCodeBlock(content);
                 var set = new ShowdownSet(content);
 
-                // Conditions for ignoring AutoOT
+                // Conditions for ignoring AutoOT (Showdown syntax OR Batch Commands)
                 var ignoreAutoOT =
-                    content.Contains("OT:") ||
-                    content.Contains("TID:") ||
-                    content.Contains("SID:");
+                    content.Contains("OT:", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains("TID:", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains("SID:", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains("OTGender:", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains(".OriginalTrainerName=", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains(".TrainerTID7=", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains(".TrainerSID7=", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase);
+
+                // Check if user has AutoOT permission
+                bool hasAutoOTPermission = true;
+                if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
+                {
+                    var roles = gUser.Roles.Select(z => z.Name);
+                    hasAutoOTPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
+                }
+
+                // If user doesn't have AutoOT permission, strip trainer-related batch commands
+                if (!hasAutoOTPermission)
+                {
+                    content = Helpers<T>.StripTrainerBatchCommands(content);
+                }
 
                 // Process the Showdown set for extra info (errors, lgcode, etc.)
-                var processed = await Helpers<T>.ProcessShowdownSetAsync(content, ignoreAutoOT);
+                var processed = await Helpers<T>.ProcessShowdownSetAsync(content, ignoreAutoOT, hasAutoOTPermission);
                 if (processed.Pokemon == null)
                 {
                     await Helpers<T>.SendTradeErrorEmbedAsync(Context, processed);
