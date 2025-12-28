@@ -551,7 +551,7 @@ public static class Helpers<T> where T : PKM, new()
 
     public static string RemoveBatchCommands(string content)
     {
-        var lines = content.Split('\n');
+        var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         var filteredLines = new List<string>();
 
         foreach (var line in lines)
@@ -564,12 +564,12 @@ public static class Helpers<T> where T : PKM, new()
             }
         }
 
-        return string.Join("\n", filteredLines);
+        return string.Join(Environment.NewLine, filteredLines);
     }
 
     public static string RemoveNonTrainerBatchCommands(string content)
     {
-        var lines = content.Split('\n');
+        var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         var filteredLines = new List<string>();
 
         foreach (var line in lines)
@@ -602,12 +602,12 @@ public static class Helpers<T> where T : PKM, new()
             }
         }
 
-        return string.Join("\n", filteredLines);
+        return string.Join(Environment.NewLine, filteredLines);
     }
 
     public static string RemoveTrainerDataOverrides(string content)
     {
-        var lines = content.Split('\n');
+        var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
         var filteredLines = new List<string>();
 
         foreach (var line in lines)
@@ -633,6 +633,6 @@ public static class Helpers<T> where T : PKM, new()
             }
         }
 
-        return string.Join("\n", filteredLines);
+        return string.Join(Environment.NewLine, filteredLines);
     }
 }

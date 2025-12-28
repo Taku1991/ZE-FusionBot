@@ -1271,33 +1271,54 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
         {
             try
             {
-                // Normalize content and parse Showdown set
-                // IMPORTANT: ShowdownSet is IMMUTABLE — never try to modify Nature/IVs/etc on it
+                // Normalize content
                 content = BatchCommandNormalizer.NormalizeBatchCommands(content);
                 content = ReusableActions.StripCodeBlock(content);
-                var set = new ShowdownSet(content);
 
-                // Conditions for ignoring AutoOT (Showdown syntax OR Batch Commands)
-                var ignoreAutoOT =
-                    content.Contains("OT:", StringComparison.OrdinalIgnoreCase) ||
-                    content.Contains("TID:", StringComparison.OrdinalIgnoreCase) ||
-                    content.Contains("SID:", StringComparison.OrdinalIgnoreCase) ||
-                    content.Contains("OTGender:", StringComparison.OrdinalIgnoreCase) ||
-                    content.Contains(".OriginalTrainerName=", StringComparison.OrdinalIgnoreCase) ||
-                    content.Contains(".TrainerTID7=", StringComparison.OrdinalIgnoreCase) ||
-                    content.Contains(".TrainerSID7=", StringComparison.OrdinalIgnoreCase) ||
-                    content.Contains(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase);
-
-                // Get user roles for permission checking
+                // Get user roles for permission checking and strip trainer data BEFORE parsing
                 IEnumerable<string>? userRoles = null;
                 if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
                 {
                     userRoles = gUser.Roles.Select(z => z.Name);
                 }
 
-                // Process the Showdown set for extra info (errors, lgcode, etc.)
-                // ProcessShowdownSetAsync will handle stripping based on user roles
-                var processed = await Helpers<T>.ProcessShowdownSetAsync(content, ignoreAutoOT, userRoles);
+                // Strip trainer data and batch commands based on user permissions BEFORE parsing ShowdownSet
+                bool canUseBatchCommands = true;
+                bool canOverrideTrainerData = true;
+                if (userRoles != null && SysCordSettings.Manager != null)
+                {
+                    canUseBatchCommands = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesUseBatchCommands), userRoles);
+                    canOverrideTrainerData = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), userRoles);
+                }
+
+                // Remove trainer data if user doesn't have permission
+                if (!canOverrideTrainerData && Helpers<T>.ContainsTrainerDataOverride(content))
+                {
+                    content = Helpers<T>.RemoveTrainerDataOverrides(content);
+                }
+
+                // Remove non-trainer batch commands if user doesn't have permission
+                if (!canUseBatchCommands && Helpers<T>.ContainsBatchCommands(content))
+                {
+                    content = Helpers<T>.RemoveNonTrainerBatchCommands(content);
+                }
+
+                // NOW parse the ShowdownSet AFTER stripping
+                var set = new ShowdownSet(content);
+
+                // Conditions for ignoring AutoOT (check if ORIGINAL content had trainer data)
+                var ignoreAutoOT = !canOverrideTrainerData ? false :
+                    (content.Contains("OT:", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains("TID:", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains("SID:", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains("OTGender:", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains(".OriginalTrainerName=", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains(".TrainerTID7=", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains(".TrainerSID7=", StringComparison.OrdinalIgnoreCase) ||
+                    content.Contains(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase));
+
+                // Process the Showdown set for validation
+                var processed = await Helpers<T>.ProcessShowdownSetAsync(content, ignoreAutoOT, null);
                 if (processed.Pokemon == null)
                 {
                     await Helpers<T>.SendTradeErrorEmbedAsync(Context, processed);
