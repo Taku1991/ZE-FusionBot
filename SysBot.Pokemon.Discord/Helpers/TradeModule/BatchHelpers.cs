@@ -25,7 +25,7 @@ public static class BatchHelpers<T> where T : PKM, new()
             tradeContent = Helpers<T>.StripTrainerBatchCommands(tradeContent);
         }
 
-        var result = await Helpers<T>.ProcessShowdownSetAsync(tradeContent, ignoreAutoOT: false, hasAutoOTPermission);
+        var result = await Helpers<T>.ProcessShowdownSetAsync(tradeContent, ignoreAutoOT: false);
 
         if (result.Pokemon != null)
         {

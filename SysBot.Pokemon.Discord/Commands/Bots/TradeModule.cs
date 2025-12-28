@@ -1272,7 +1272,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                 }
 
                 // Process the Showdown set for extra info (errors, lgcode, etc.)
-                var processed = await Helpers<T>.ProcessShowdownSetAsync(content, ignoreAutoOT, hasAutoOTPermission);
+                var processed = await Helpers<T>.ProcessShowdownSetAsync(content, ignoreAutoOT);
                 if (processed.Pokemon == null)
                 {
                     await Helpers<T>.SendTradeErrorEmbedAsync(Context, processed);
