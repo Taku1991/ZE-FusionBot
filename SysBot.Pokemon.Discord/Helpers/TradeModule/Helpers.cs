@@ -480,8 +480,8 @@ public static class Helpers<T> where T : PKM, new()
             }
         }
 
-        // Check if user has permission to use AutoOT
-        if (!ignoreAutoOT && SysCordSettings.Manager != null)
+        // Check if user has permission to use AutoOT (ALWAYS check, regardless of ignoreAutoOT value)
+        if (SysCordSettings.Manager != null)
         {
             if (context.User is SocketGuildUser gUser)
             {
@@ -501,7 +501,7 @@ public static class Helpers<T> where T : PKM, new()
     }
 
     /// <summary>
-    /// Removes trainer-related batch commands from content if user doesn't have AutoOT permission
+    /// Removes trainer-related batch commands from content if user doesn't have RolesUseBatchCommands permission
     /// </summary>
     public static string StripTrainerBatchCommands(string content)
     {
@@ -519,6 +519,33 @@ public static class Helpers<T> where T : PKM, new()
                 trimmedLine.StartsWith(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase) ||
                 trimmedLine.StartsWith(".TID16=", StringComparison.OrdinalIgnoreCase) ||
                 trimmedLine.StartsWith(".SID16=", StringComparison.OrdinalIgnoreCase))
+            {
+                continue; // Skip this line
+            }
+
+            filteredLines.Add(line);
+        }
+
+        return string.Join(Environment.NewLine, filteredLines);
+    }
+
+    /// <summary>
+    /// Removes Showdown-style trainer data from content if user doesn't have RolesAutoOT permission
+    /// </summary>
+    public static string StripShowdownTrainerData(string content)
+    {
+        var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
+        var filteredLines = new List<string>();
+
+        foreach (var line in lines)
+        {
+            var trimmedLine = line.Trim();
+
+            // Skip lines that contain Showdown-style trainer data
+            if (trimmedLine.StartsWith("OT:", StringComparison.OrdinalIgnoreCase) ||
+                trimmedLine.StartsWith("TID:", StringComparison.OrdinalIgnoreCase) ||
+                trimmedLine.StartsWith("SID:", StringComparison.OrdinalIgnoreCase) ||
+                trimmedLine.StartsWith("OTGender:", StringComparison.OrdinalIgnoreCase))
             {
                 continue; // Skip this line
             }

@@ -216,17 +216,24 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
         content = BatchCommandNormalizer.NormalizeBatchCommands(content);
         content = ReusableActions.StripCodeBlock(content);
 
-        // Check if user has batch commands permission and strip trainer batch commands if not
+        // Check user permissions
         bool hasBatchCommandsPermission = true;
+        bool hasAutoOTPermission = true;
         if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
         {
             var roles = gUser.Roles.Select(z => z.Name);
             hasBatchCommandsPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesUseBatchCommands), roles);
+            hasAutoOTPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
         }
 
         if (!hasBatchCommandsPermission)
         {
             content = Helpers<T>.StripTrainerBatchCommands(content);
+        }
+
+        if (!hasAutoOTPermission)
+        {
+            content = Helpers<T>.StripShowdownTrainerData(content);
         }
 
         var set = new ShowdownSet(content);
@@ -690,12 +697,14 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
 
         var processingMessage = await ReplyAsync($"{user.Mention} Processing your text trade with {selections.Count} Pokémon...");
 
-        // Check if user has batch commands permission
+        // Check user permissions
         bool hasBatchCommandsPermission = true;
+        bool hasAutoOTPermission = true;
         if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
         {
             var roles = gUser.Roles.Select(z => z.Name);
             hasBatchCommandsPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesUseBatchCommands), roles);
+            hasAutoOTPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
         }
 
         // Process as batch trade using the batch system
@@ -713,7 +722,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                     tradeContent = ReusableActions.StripCodeBlock(tradeContent);
                     tradeContent = BatchCommandNormalizer.NormalizeBatchCommands(tradeContent);
 
-                    var (pk, error, set, legalizationHint) = await BatchHelpers<T>.ProcessSingleTradeForBatch(tradeContent, hasBatchCommandsPermission);
+                    var (pk, error, set, legalizationHint) = await BatchHelpers<T>.ProcessSingleTradeForBatch(tradeContent, hasBatchCommandsPermission, hasAutoOTPermission);
 
                     if (pk != null)
                     {
@@ -940,12 +949,14 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
 
         var processingMessage = await Context.Channel.SendMessageAsync($"{Context.User.Mention} Processing your batch trade with {trades.Count} Pokémon...");
 
-        // Check if user has batch commands permission
+        // Check user permissions
         bool hasBatchCommandsPermission = true;
+        bool hasAutoOTPermission = true;
         if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
         {
             var roles = gUser.Roles.Select(z => z.Name);
             hasBatchCommandsPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesUseBatchCommands), roles);
+            hasAutoOTPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
         }
 
         _ = Task.Run(async () =>
@@ -956,7 +967,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                 var errors = new List<BatchTradeError>();
                 for (int i = 0; i < trades.Count; i++)
                 {
-                    var (pk, error, set, legalizationHint) = await BatchHelpers<T>.ProcessSingleTradeForBatch(trades[i], hasBatchCommandsPermission);
+                    var (pk, error, set, legalizationHint) = await BatchHelpers<T>.ProcessSingleTradeForBatch(trades[i], hasBatchCommandsPermission, hasAutoOTPermission);
                     if (pk != null)
                     {
                         batchPokemonList.Add(pk);
@@ -1275,18 +1286,26 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                     content.Contains(".TrainerSID7=", StringComparison.OrdinalIgnoreCase) ||
                     content.Contains(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase);
 
-                // Check if user has batch commands permission
+                // Check user permissions
                 bool hasBatchCommandsPermission = true;
+                bool hasAutoOTPermission = true;
                 if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
                 {
                     var roles = gUser.Roles.Select(z => z.Name);
                     hasBatchCommandsPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesUseBatchCommands), roles);
+                    hasAutoOTPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
                 }
 
                 // If user doesn't have batch commands permission, strip trainer-related batch commands
                 if (!hasBatchCommandsPermission)
                 {
                     content = Helpers<T>.StripTrainerBatchCommands(content);
+                }
+
+                // If user doesn't have AutoOT permission, strip Showdown trainer data
+                if (!hasAutoOTPermission)
+                {
+                    content = Helpers<T>.StripShowdownTrainerData(content);
                 }
 
                 // Process the Showdown set for extra info (errors, lgcode, etc.)
