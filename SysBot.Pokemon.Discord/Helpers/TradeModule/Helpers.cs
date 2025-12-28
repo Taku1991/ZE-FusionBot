@@ -480,6 +480,21 @@ public static class Helpers<T> where T : PKM, new()
             }
         }
 
+        // Check if user has permission to use AutoOT
+        if (!ignoreAutoOT && SysCordSettings.Manager != null)
+        {
+            if (context.User is SocketGuildUser gUser)
+            {
+                var roles = gUser.Roles.Select(z => z.Name);
+                bool hasAutoOTRole = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
+                if (!hasAutoOTRole)
+                {
+                    // User doesn't have AutoOT permission, force ignoreAutoOT to true
+                    ignoreAutoOT = true;
+                }
+            }
+        }
+
         await QueueHelper<T>.AddToQueueAsync(context, code, trainerName, sig, pk!, PokeRoutineType.LinkTrade,
             tradeType, usr, isBatchTrade, batchTradeNumber, totalBatchTrades, isHiddenTrade, isMysteryEgg,
             lgcode: lgcode, ignoreAutoOT: ignoreAutoOT, setEdited: setEdited, isNonNative: isNonNative).ConfigureAwait(false);

@@ -150,7 +150,22 @@ namespace SysBot.Pokemon.Discord
                 var lgcode = Info.GetRandomLGTradeCode();
                 var sig = Context.User.GetFavor();
 
-                await AddTradeToQueueAsync(code, Context.User.Username, pk, sig, Context.User, lgcode: lgcode).ConfigureAwait(false);
+                // Check if user has permission to use AutoOT
+                bool ignoreAutoOT = false;
+                if (SysCordSettings.Manager != null)
+                {
+                    if (Context.User is SocketGuildUser gUser)
+                    {
+                        var roles = gUser.Roles.Select(z => z.Name);
+                        if (!SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles))
+                        {
+                            // User doesn't have AutoOT permission, force ignoreAutoOT to true
+                            ignoreAutoOT = true;
+                        }
+                    }
+                }
+
+                await AddTradeToQueueAsync(code, Context.User.Username, pk, sig, Context.User, lgcode: lgcode, ignoreAutoOT: ignoreAutoOT).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

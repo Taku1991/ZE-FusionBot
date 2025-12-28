@@ -378,6 +378,18 @@ namespace SysBot.Pokemon.Discord
             if (!la.Valid)
                 return;
 
+            // Check if user has permission to use AutoOT
+            bool ignoreAutoOT = false;
+            if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
+            {
+                var roles = gUser.Roles.Select(z => z.Name);
+                if (!SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles))
+                {
+                    // User doesn't have AutoOT permission, force ignoreAutoOT to true
+                    ignoreAutoOT = true;
+                }
+            }
+
             await QueueHelper<T>.AddToQueueAsync(
                 Context,
                 code,
@@ -386,7 +398,8 @@ namespace SysBot.Pokemon.Discord
                 pk,
                 PokeRoutineType.LinkTrade,
                 PokeTradeType.Specific,
-                usr
+                usr,
+                ignoreAutoOT: ignoreAutoOT
             );
         }
     }
