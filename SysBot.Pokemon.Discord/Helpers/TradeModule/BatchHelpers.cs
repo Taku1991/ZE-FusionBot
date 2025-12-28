@@ -17,10 +17,10 @@ public static class BatchHelpers<T> where T : PKM, new()
         return [.. content.Split(delimiters, StringSplitOptions.RemoveEmptyEntries).Select(trade => trade.Trim())];
     }
 
-    public static async Task<(T? Pokemon, string? Error, ShowdownSet? Set, string? LegalizationHint)> ProcessSingleTradeForBatch(string tradeContent, bool hasAutoOTPermission = true)
+    public static async Task<(T? Pokemon, string? Error, ShowdownSet? Set, string? LegalizationHint)> ProcessSingleTradeForBatch(string tradeContent, bool hasBatchCommandsPermission = false)
     {
-        // If user doesn't have AutoOT permission, strip trainer-related batch commands
-        if (!hasAutoOTPermission)
+        // If user doesn't have batch commands permission, strip trainer-related batch commands
+        if (!hasBatchCommandsPermission)
         {
             tradeContent = Helpers<T>.StripTrainerBatchCommands(tradeContent);
         }

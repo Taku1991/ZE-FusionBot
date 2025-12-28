@@ -356,3 +356,6 @@ MigrationBackup/
 
 # Old bot backup folder
 PokeBot/
+
+# Claude
+.claude/

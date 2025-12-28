@@ -1,5 +1,6 @@
 using Discord;
 using Discord.Commands;
+using Discord.WebSocket;
 using PKHeX.Core;
 using PKHeX.Core.AutoMod;
 using SysBot.Base;
@@ -150,6 +151,17 @@ namespace SysBot.Pokemon.Discord
 
             int uniqueTradeID = GenerateUniqueTradeID();
 
+            // Check if user has permission to use AutoOT
+            bool ignoreAutoOT = false;
+            if (SysCordSettings.Manager != null && context.User is SocketGuildUser gUser)
+            {
+                var roles = gUser.Roles.Select(z => z.Name);
+                if (!SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles))
+                {
+                    ignoreAutoOT = true;
+                }
+            }
+
             var detail = new PokeTradeDetail<T>(
                 firstEgg,
                 trainer,
@@ -162,7 +174,8 @@ namespace SysBot.Pokemon.Discord
                 batchEggList.Count,
                 true,               // send code DM
                 true,               // <-- THIS ONE WAS MISSING
-                uniqueTradeID       // now correctly argument 12
+                uniqueTradeID,       // now correctly argument 12
+                ignoreAutoOT         // Add ignoreAutoOT parameter
             )
             {
                 BatchTrades = batchEggList
@@ -398,10 +411,22 @@ namespace SysBot.Pokemon.Discord
             }
 
             var sig = Context.User.GetFavor();
+
+            // Check if user has permission to use AutoOT
+            bool ignoreAutoOT = false;
+            if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
+            {
+                var roles = gUser.Roles.Select(z => z.Name);
+                if (!SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles))
+                {
+                    ignoreAutoOT = true;
+                }
+            }
+
             await QueueHelper<T>.AddToQueueAsync(
                 Context, code, Context.User.Username, sig, mysteryEgg,
                 PokeRoutineType.LinkTrade, PokeTradeType.Specific, Context.User,
-                isMysteryEgg: true, lgcode: GenerateRandomPictocodes(3)
+                isMysteryEgg: true, lgcode: GenerateRandomPictocodes(3), ignoreAutoOT: ignoreAutoOT
             ).ConfigureAwait(false);
 
             if (Context.Message is IUserMessage userMessage)
