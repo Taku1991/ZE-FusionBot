@@ -19,19 +19,11 @@ public static class BatchHelpers<T> where T : PKM, new()
 
     public static async Task<(T? Pokemon, string? Error, ShowdownSet? Set, string? LegalizationHint)> ProcessSingleTradeForBatch(string tradeContent, bool hasBatchCommandsPermission = false, bool hasAutoOTPermission = false)
     {
-        // If user doesn't have batch commands permission, strip trainer-related batch commands
-        if (!hasBatchCommandsPermission)
-        {
-            tradeContent = Helpers<T>.StripTrainerBatchCommands(tradeContent);
-        }
+        // If user has both permissions, pass null to skip permission checks in ProcessShowdownSetAsync
+        // Otherwise pass an empty list which will cause GetHasRoleAccess to return false
+        IEnumerable<string>? userRoles = (hasBatchCommandsPermission && hasAutoOTPermission) ? null : new List<string>();
 
-        // If user doesn't have AutoOT permission, strip Showdown trainer data
-        if (!hasAutoOTPermission)
-        {
-            tradeContent = Helpers<T>.StripShowdownTrainerData(tradeContent);
-        }
-
-        var result = await Helpers<T>.ProcessShowdownSetAsync(tradeContent, ignoreAutoOT: false);
+        var result = await Helpers<T>.ProcessShowdownSetAsync(tradeContent, ignoreAutoOT: false, userRoles: userRoles);
 
         if (result.Pokemon != null)
         {

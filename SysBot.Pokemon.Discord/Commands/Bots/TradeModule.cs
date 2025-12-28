@@ -226,14 +226,16 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
             hasAutoOTPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
         }
 
-        if (!hasBatchCommandsPermission)
+        // Remove batch commands if user doesn't have permission
+        if (!hasBatchCommandsPermission && Helpers<T>.ContainsBatchCommands(content))
         {
-            content = Helpers<T>.StripTrainerBatchCommands(content);
+            content = Helpers<T>.RemoveBatchCommands(content);
         }
 
-        if (!hasAutoOTPermission)
+        // Remove trainer data overrides if user doesn't have permission
+        if (!hasAutoOTPermission && Helpers<T>.ContainsTrainerDataOverride(content))
         {
-            content = Helpers<T>.StripShowdownTrainerData(content);
+            content = Helpers<T>.RemoveTrainerDataOverrides(content);
         }
 
         var set = new ShowdownSet(content);
@@ -1286,30 +1288,16 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                     content.Contains(".TrainerSID7=", StringComparison.OrdinalIgnoreCase) ||
                     content.Contains(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase);
 
-                // Check user permissions
-                bool hasBatchCommandsPermission = true;
-                bool hasAutoOTPermission = true;
+                // Get user roles for permission checking
+                IEnumerable<string>? userRoles = null;
                 if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
                 {
-                    var roles = gUser.Roles.Select(z => z.Name);
-                    hasBatchCommandsPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesUseBatchCommands), roles);
-                    hasAutoOTPermission = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
-                }
-
-                // If user doesn't have batch commands permission, strip trainer-related batch commands
-                if (!hasBatchCommandsPermission)
-                {
-                    content = Helpers<T>.StripTrainerBatchCommands(content);
-                }
-
-                // If user doesn't have AutoOT permission, strip Showdown trainer data
-                if (!hasAutoOTPermission)
-                {
-                    content = Helpers<T>.StripShowdownTrainerData(content);
+                    userRoles = gUser.Roles.Select(z => z.Name);
                 }
 
                 // Process the Showdown set for extra info (errors, lgcode, etc.)
-                var processed = await Helpers<T>.ProcessShowdownSetAsync(content, ignoreAutoOT);
+                // ProcessShowdownSetAsync will handle stripping based on user roles
+                var processed = await Helpers<T>.ProcessShowdownSetAsync(content, ignoreAutoOT, userRoles);
                 if (processed.Pokemon == null)
                 {
                     await Helpers<T>.SendTradeErrorEmbedAsync(Context, processed);

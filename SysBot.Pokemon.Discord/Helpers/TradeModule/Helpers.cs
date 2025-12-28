@@ -122,9 +122,32 @@ public static class Helpers<T> where T : PKM, new()
         }
     }
 
-    public static Task<ProcessedPokemonResult<T>> ProcessShowdownSetAsync(string content, bool ignoreAutoOT = false)
+    public static Task<ProcessedPokemonResult<T>> ProcessShowdownSetAsync(string content, bool ignoreAutoOT = false, IEnumerable<string>? userRoles = null)
     {
+        content = ReusableActions.StripCodeBlock(content);
         bool isEgg = TradeExtensions<T>.IsEggCheck(content);
+
+        // Check role-based permissions for Batch Commands and Trainer Data Override
+        bool canUseBatchCommands = true;
+        bool canOverrideTrainerData = true;
+
+        if (userRoles != null && SysCordSettings.Manager != null)
+        {
+            canUseBatchCommands = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesUseBatchCommands), userRoles);
+            canOverrideTrainerData = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), userRoles);
+        }
+
+        // If user doesn't have permission for Batch Commands, remove them from content
+        if (!canUseBatchCommands && ContainsBatchCommands(content))
+        {
+            content = RemoveBatchCommands(content);
+        }
+
+        // If user doesn't have permission for Trainer Data Override, remove them from content
+        if (!canOverrideTrainerData && ContainsTrainerDataOverride(content))
+        {
+            content = RemoveTrainerDataOverrides(content);
+        }
 
         if (!ShowdownParsing.TryParseAnyLanguage(content, out ShowdownSet? set) || set == null || set.Species == 0)
         {
@@ -500,59 +523,55 @@ public static class Helpers<T> where T : PKM, new()
             lgcode: lgcode, ignoreAutoOT: ignoreAutoOT, setEdited: setEdited, isNonNative: isNonNative).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// Removes trainer-related batch commands from content if user doesn't have RolesUseBatchCommands permission
-    /// </summary>
-    public static string StripTrainerBatchCommands(string content)
+    public static bool ContainsBatchCommands(string content)
     {
-        var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
-        var filteredLines = new List<string>();
-
-        foreach (var line in lines)
-        {
-            var trimmedLine = line.Trim();
-
-            // Skip lines that contain trainer-related batch commands
-            if (trimmedLine.StartsWith(".OriginalTrainerName=", StringComparison.OrdinalIgnoreCase) ||
-                trimmedLine.StartsWith(".TrainerTID7=", StringComparison.OrdinalIgnoreCase) ||
-                trimmedLine.StartsWith(".TrainerSID7=", StringComparison.OrdinalIgnoreCase) ||
-                trimmedLine.StartsWith(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase) ||
-                trimmedLine.StartsWith(".TID16=", StringComparison.OrdinalIgnoreCase) ||
-                trimmedLine.StartsWith(".SID16=", StringComparison.OrdinalIgnoreCase))
-            {
-                continue; // Skip this line
-            }
-
-            filteredLines.Add(line);
-        }
-
-        return string.Join(Environment.NewLine, filteredLines);
+        // Check for common batch editing patterns
+        return content.Contains('.') &&
+               (content.Contains('=') || content.Contains("++") || content.Contains("--"));
     }
 
-    /// <summary>
-    /// Removes Showdown-style trainer data from content if user doesn't have RolesAutoOT permission
-    /// </summary>
-    public static string StripShowdownTrainerData(string content)
+    public static bool ContainsTrainerDataOverride(string content)
     {
-        var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.None);
+        // Check if the original content contains trainer data overrides
+        return content.Contains("OT:") ||
+               content.Contains("TID:") ||
+               content.Contains("SID:") ||
+               content.Contains("OTGender:");
+    }
+
+    public static string RemoveBatchCommands(string content)
+    {
+        var lines = content.Split('\n');
         var filteredLines = new List<string>();
 
         foreach (var line in lines)
         {
-            var trimmedLine = line.Trim();
-
-            // Skip lines that contain Showdown-style trainer data
-            if (trimmedLine.StartsWith("OT:", StringComparison.OrdinalIgnoreCase) ||
-                trimmedLine.StartsWith("TID:", StringComparison.OrdinalIgnoreCase) ||
-                trimmedLine.StartsWith("SID:", StringComparison.OrdinalIgnoreCase) ||
-                trimmedLine.StartsWith("OTGender:", StringComparison.OrdinalIgnoreCase))
+            // Keep lines that don't contain batch command patterns (lines starting with .)
+            var trimmed = line.Trim();
+            if (!trimmed.StartsWith('.'))
             {
-                continue; // Skip this line
+                filteredLines.Add(line);
             }
-
-            filteredLines.Add(line);
         }
 
-        return string.Join(Environment.NewLine, filteredLines);
+        return string.Join("\n", filteredLines);
+    }
+
+    public static string RemoveTrainerDataOverrides(string content)
+    {
+        var lines = content.Split('\n');
+        var filteredLines = new List<string>();
+
+        foreach (var line in lines)
+        {
+            // Remove lines that contain trainer data overrides
+            if (!(line.Contains("OT:") || line.Contains("TID:") ||
+                  line.Contains("SID:") || line.Contains("OTGender:")))
+            {
+                filteredLines.Add(line);
+            }
+        }
+
+        return string.Join("\n", filteredLines);
     }
 }
