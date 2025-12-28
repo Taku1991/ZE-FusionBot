@@ -137,16 +137,17 @@ public static class Helpers<T> where T : PKM, new()
             canOverrideTrainerData = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), userRoles);
         }
 
-        // If user doesn't have permission for Batch Commands, remove them from content
-        if (!canUseBatchCommands && ContainsBatchCommands(content))
-        {
-            content = RemoveBatchCommands(content);
-        }
-
+        // IMPORTANT: Remove trainer data overrides FIRST, then other batch commands
         // If user doesn't have permission for Trainer Data Override, remove them from content
         if (!canOverrideTrainerData && ContainsTrainerDataOverride(content))
         {
             content = RemoveTrainerDataOverrides(content);
+        }
+
+        // If user doesn't have permission for Batch Commands, remove NON-TRAINER batch commands from content
+        if (!canUseBatchCommands && ContainsBatchCommands(content))
+        {
+            content = RemoveNonTrainerBatchCommands(content);
         }
 
         if (!ShowdownParsing.TryParseAnyLanguage(content, out ShowdownSet? set) || set == null || set.Species == 0)
@@ -525,18 +526,27 @@ public static class Helpers<T> where T : PKM, new()
 
     public static bool ContainsBatchCommands(string content)
     {
-        // Check for common batch editing patterns
+        // Check for ANY batch command patterns (not trainer-specific)
         return content.Contains('.') &&
                (content.Contains('=') || content.Contains("++") || content.Contains("--"));
     }
 
     public static bool ContainsTrainerDataOverride(string content)
     {
-        // Check if the original content contains trainer data overrides
-        return content.Contains("OT:") ||
-               content.Contains("TID:") ||
-               content.Contains("SID:") ||
-               content.Contains("OTGender:");
+        // Check if the original content contains trainer data overrides (Showdown style OR Batch commands)
+        return content.Contains("OT:", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains("TID:", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains("SID:", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains("OTGender:", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains(".OriginalTrainerName=", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains(".TrainerTID7=", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains(".TrainerID7=", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains(".DisplayTID=", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains(".TrainerSID7=", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains(".DisplaySID=", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains(".TID16=", StringComparison.OrdinalIgnoreCase) ||
+               content.Contains(".SID16=", StringComparison.OrdinalIgnoreCase);
     }
 
     public static string RemoveBatchCommands(string content)
@@ -546,10 +556,48 @@ public static class Helpers<T> where T : PKM, new()
 
         foreach (var line in lines)
         {
-            // Keep lines that don't contain batch command patterns (lines starting with .)
+            // Remove ALL batch command lines (lines starting with .)
             var trimmed = line.Trim();
             if (!trimmed.StartsWith('.'))
             {
+                filteredLines.Add(line);
+            }
+        }
+
+        return string.Join("\n", filteredLines);
+    }
+
+    public static string RemoveNonTrainerBatchCommands(string content)
+    {
+        var lines = content.Split('\n');
+        var filteredLines = new List<string>();
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+
+            // If it's a batch command line (starts with .)
+            if (trimmed.StartsWith('.'))
+            {
+                // Keep ONLY trainer-related batch commands, remove everything else
+                if (trimmed.StartsWith(".OriginalTrainerName=", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(".TrainerTID7=", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(".TrainerID7=", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(".DisplayTID=", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(".TrainerSID7=", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(".DisplaySID=", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(".TID16=", StringComparison.OrdinalIgnoreCase) ||
+                    trimmed.StartsWith(".SID16=", StringComparison.OrdinalIgnoreCase))
+                {
+                    // This is a trainer-related command, keep it
+                    filteredLines.Add(line);
+                }
+                // else: skip this line (it's a non-trainer batch command)
+            }
+            else
+            {
+                // Not a batch command, keep it
                 filteredLines.Add(line);
             }
         }
@@ -564,9 +612,22 @@ public static class Helpers<T> where T : PKM, new()
 
         foreach (var line in lines)
         {
-            // Remove lines that contain trainer data overrides
-            if (!(line.Contains("OT:") || line.Contains("TID:") ||
-                  line.Contains("SID:") || line.Contains("OTGender:")))
+            var trimmed = line.Trim();
+
+            // Remove lines that contain trainer data overrides (both Showdown style and Batch commands)
+            if (!(trimmed.StartsWith("OT:", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith("TID:", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith("SID:", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith("OTGender:", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith(".OriginalTrainerName=", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith(".TrainerTID7=", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith(".TrainerID7=", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith(".DisplayTID=", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith(".TrainerSID7=", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith(".DisplaySID=", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith(".OriginalTrainerGender=", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith(".TID16=", StringComparison.OrdinalIgnoreCase) ||
+                  trimmed.StartsWith(".SID16=", StringComparison.OrdinalIgnoreCase)))
             {
                 filteredLines.Add(line);
             }
