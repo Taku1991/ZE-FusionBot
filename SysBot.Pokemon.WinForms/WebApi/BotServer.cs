@@ -13,6 +13,9 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Drawing;
 using SysBot.Base;
+using SysBot.Pokemon.Helpers;
+using SysBot.Pokemon;
+// using SysBot.Pokemon.WinForms.Controls;
 using SysBot.Pokemon.WinForms.WebApi.Models;
 using static SysBot.Pokemon.WinForms.WebApi.RestartManager;
 
@@ -106,25 +109,100 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
 
         try
         {
-            _listener = new HttpListener();
-
-            try
+            _listener = new HttpListener
             {
-                _listener.Prefixes.Add($"http://+:{_port}/");
-                _listener.Start();
-                LogUtil.LogInfo($"Web server listening on all interfaces at port {_port}", "WebServer");
+                AuthenticationSchemes = AuthenticationSchemes.Anonymous,
+                IgnoreWriteExceptions = true
+            };
+
+            // Check if external connections are allowed
+            var config = GetConfig();
+            var allowExternal = config?.Hub?.WebServer?.AllowExternalConnections ?? false;
+
+            if (allowExternal)
+            {
+                try
+                {
+                    // Windows http.sys workaround: bind to specific IP addresses
+                    // Get all non-loopback IPv4 addresses
+                    var localAddresses = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                        .Where(i => i.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+                        .SelectMany(i => i.GetIPProperties().UnicastAddresses)
+                        .Where(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+                                 && !System.Net.IPAddress.IsLoopback(a.Address))
+                        .Select(a => a.Address.ToString())
+                        .ToList();
+
+                    // Also add localhost
+                    _listener.Prefixes.Add($"http://localhost:{_port}/");
+                    _listener.Prefixes.Add($"http://127.0.0.1:{_port}/");
+
+                    // Add each network IP
+                    foreach (var ip in localAddresses)
+                    {
+                        _listener.Prefixes.Add($"http://{ip}:{_port}/");
+                        LogUtil.LogInfo($"Adding binding for: http://{ip}:{_port}/", "WebServer");
+                    }
+
+                    LogUtil.LogInfo($"Attempting to bind to {localAddresses.Count + 2} addresses (AllowExternalConnections=true)", "WebServer");
+                    LogUtil.LogInfo($"Current process ID: {Environment.ProcessId}", "WebServer");
+
+                    _listener.Start();
+
+                    // Verify the actual prefixes that were registered
+                    LogUtil.LogInfo($"HttpListener.Start() succeeded. Registered prefixes:", "WebServer");
+                    foreach (var prefix in _listener.Prefixes)
+                    {
+                        LogUtil.LogInfo($"  - {prefix}", "WebServer");
+                    }
+                    LogUtil.LogInfo($"Web server listening on all configured interfaces at port {_port}", "WebServer");
+                    LogUtil.LogInfo($"Verify with: netstat -ano | findstr :{_port}", "WebServer");
+                }
+                catch (HttpListenerException ex) when (ex.ErrorCode == 5)
+                {
+                    LogUtil.LogError($"Failed to bind to all interfaces. Access denied (Error 5).", "WebServer");
+                    LogUtil.LogError($"URL reservation exists but insufficient permissions.", "WebServer");
+                    LogUtil.LogInfo("Verify with: netsh http show urlacl url=http://+:{_port}/", "WebServer");
+
+                    _listener = new HttpListener();
+                    _listener.Prefixes.Add($"http://localhost:{_port}/");
+                    _listener.Prefixes.Add($"http://127.0.0.1:{_port}/");
+
+                    // Add IPv6 localhost support to prevent "request not supported" errors
+                    try
+                    {
+                        _listener.Prefixes.Add($"http://[::1]:{_port}/");
+                    }
+                    catch
+                    {
+                        // IPv6 might not be available, continue without it
+                    }
+
+                    _listener.Start();
+
+                    LogUtil.LogError($"Web server requires administrator privileges for network access. Currently limited to localhost only.", "WebServer");
+                    LogUtil.LogInfo("To enable network access, either:", "WebServer");
+                    LogUtil.LogInfo("1. Run this application as Administrator", "WebServer");
+                    LogUtil.LogInfo($"2. Or run this command as admin: netsh http add urlacl url=http://+:{_port}/ user=Everyone", "WebServer");
+                }
+                catch (Exception ex)
+                {
+                    LogUtil.LogError($"Unexpected error binding to all interfaces: {ex.Message}", "WebServer");
+                    throw;
+                }
             }
-            catch (HttpListenerException ex) when (ex.ErrorCode == 5)
+            else
             {
-                _listener = new HttpListener();
-                _listener.Prefixes.Add($"http://localhost:{_port}/");
+                // Localhost only mode - IPv4 only to avoid connection reset issues
+                _listener.Prefixes.Clear();
                 _listener.Prefixes.Add($"http://127.0.0.1:{_port}/");
+                _listener.Prefixes.Add($"http://localhost:{_port}/");
+
                 _listener.Start();
 
-                LogUtil.LogError($"Web server requires administrator privileges for network access. Currently limited to localhost only.", "WebServer");
-                LogUtil.LogInfo("To enable network access, either:", "WebServer");
-                LogUtil.LogInfo("1. Run this application as Administrator", "WebServer");
-                LogUtil.LogInfo($"2. Or run this command as admin: netsh http add urlacl url=http://+:{_port}/ user=Everyone", "WebServer");
+                // Debug: Log registered prefixes
+                LogUtil.LogInfo($"Web server listening on localhost only at port {_port} (AllowExternalConnections=false)", "WebServer");
+                LogUtil.LogInfo($"Registered prefixes: {string.Join(", ", _listener.Prefixes)}", "WebServer");
             }
 
             _running = true;
@@ -165,36 +243,23 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
 
     private void Listen()
     {
-        while (_running && _listener != null)
+        while (_running && _listener != null && _listener.IsListening)
         {
+            HttpListenerContext? context = null;
             try
             {
-                var asyncResult = _listener.BeginGetContext(null, null);
-
-                while (_running && !asyncResult.AsyncWaitHandle.WaitOne(100))
-                {
-                }
-
-                if (!_running)
-                    break;
-
-                var context = _listener.EndGetContext(asyncResult);
-
-                ThreadPool.QueueUserWorkItem(async _ =>
-                {
-                    try
-                    {
-                        await HandleRequest(context);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogUtil.LogError($"Error handling request: {ex.Message}", "WebServer");
-                    }
-                });
+                context = _listener.GetContext(); // Synchronous, blocking call - more stable than BeginGetContext
             }
             catch (HttpListenerException ex) when (!_running || ex.ErrorCode == 995)
             {
+                // Operation cancelled or service stopped
                 break;
+            }
+            catch (HttpListenerException ex) when (ex.ErrorCode == 50)
+            {
+                // Error 50: Request not supported (IPv6 on IPv4-only listener)
+                // Silently ignore - this happens when browser sends IPv6 requests
+                continue;
             }
             catch (ObjectDisposedException) when (!_running)
             {
@@ -204,9 +269,43 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
             {
                 if (_running)
                 {
-                    LogUtil.LogError($"Error in listener: {ex.Message}", "WebServer");
+                    LogUtil.LogError($"Error accepting context: {ex.GetType().Name} - {ex.Message} (ErrorCode: {(ex is HttpListenerException hle ? hle.ErrorCode.ToString() : "N/A")})", "WebServer");
                 }
+                continue;
             }
+
+            // Filter out IPv6 requests if they somehow got through
+            if (context.Request.RemoteEndPoint?.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            {
+                try
+                {
+                    context.Response.StatusCode = 400;
+                    context.Response.Close();
+                }
+                catch { }
+                continue;
+            }
+
+            // Handle request asynchronously on thread pool
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await HandleRequest(context);
+                }
+                catch (Exception ex)
+                {
+                    try
+                    {
+                        await TrySendErrorResponseAsync(context.Response, 500, "Internal Server Error");
+                    }
+                    catch
+                    {
+                        // Client disconnected or response already closed
+                    }
+                    LogUtil.LogError($"Error handling request: {ex.Message}", "WebServer");
+                }
+            });
         }
     }
 
@@ -216,6 +315,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
         try
         {
             var request = context.Request;
+
             SetCorsHeaders(request, response);
 
             if (request.HttpMethod == "OPTIONS")
@@ -902,7 +1002,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
         var controllers = GetBotControllers();
 
         var mode = config?.Mode.ToString() ?? "Unknown";
-        var name = config?.Hub?.BotName ?? "ZE_FusionBot";
+        var name = config?.Hub?.BotName ?? "PokeBot";
 
         var version = SysBot.Pokemon.PokeBot.Version;
 
@@ -978,13 +1078,13 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                     
                     if (!string.IsNullOrEmpty(response) && response.StartsWith('{'))
                     {
-                        // This is a ZE_FusionBot instance - find the process ID
+                        // This is a PokeBot instance - find the process ID
                         int processId = FindProcessIdForPort(capturedPort);
                         
                         var instance = new BotInstance
                         {
                             ProcessId = processId,
-                            Name = "ZE_FusionBot",
+                            Name = "PokeBot",
                             Port = capturedPort,
                             WebPort = 8080,
                             Version = "Unknown",
@@ -1005,7 +1105,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                         discoveredPorts.Add(capturedPort);
                     }
                 }
-                catch { /* Port not open or not a ZE_FusionBot instance */ }
+                catch { /* Port not open or not a PokeBot instance */ }
                 finally
                 {
                     semaphore.Release();
@@ -1016,10 +1116,10 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
         // Wait for all port scans to complete with overall timeout
         await Task.WhenAll(tasks).ConfigureAwait(false);
 
-        // Method 2: Check local ZE_FusionBot processes (fallback for instances not in standard port range)
+        // Method 2: Check local PokeBot processes (fallback for instances not in standard port range)
         try
         {
-            var processes = Process.GetProcessesByName("ZE_FusionBot")
+            var processes = Process.GetProcessesByName("PokeBot")
                 .Where(p => p.Id != currentPid);
 
             foreach (var process in processes)
@@ -1030,13 +1130,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                     if (string.IsNullOrEmpty(exePath))
                         continue;
 
-                    var botName = "ZE_FusionBot"; // default
-                    if (!string.IsNullOrEmpty(exePath))
-                    {
-                        botName = Path.GetFileNameWithoutExtension(exePath);
-                    }
-
-                    var portFile = Path.Combine(Path.GetDirectoryName(exePath)!, $"ZE_FusionBot_{process.Id}.port");
+                    var portFile = Path.Combine(Path.GetDirectoryName(exePath)!, $"PokeBot_{process.Id}.port");
                     if (!File.Exists(portFile))
                         continue;
 
@@ -1057,7 +1151,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                     var instance = new BotInstance
                     {
                         ProcessId = process.Id,
-                        Name = botName,
+                        Name = "PokeBot",
                         Port = port,
                         WebPort = 8080,
                         Version = "Unknown",
@@ -1093,7 +1187,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
     {
         try
         {
-            var processes = Process.GetProcessesByName("ZE_FusionBot");
+            var processes = Process.GetProcessesByName("PokeBot");
             foreach (var proc in processes)
             {
                 try
@@ -1102,7 +1196,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                     if (string.IsNullOrEmpty(exePath))
                         continue;
 
-                    var portFile = Path.Combine(Path.GetDirectoryName(exePath)!, $"ZE_FusionBot_{proc.Id}.port");
+                    var portFile = Path.Combine(Path.GetDirectoryName(exePath)!, $"PokeBot_{proc.Id}.port");
                     if (File.Exists(portFile))
                     {
                         var portText = File.ReadAllText(portFile).Trim();
@@ -1156,7 +1250,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                     instance.Mode = mode.GetString() ?? "Unknown";
 
                 if (root.TryGetProperty("Name", out var name))
-                    instance.Name = name.GetString() ?? "ZE_FusionBot";
+                    instance.Name = name.GetString() ?? "PokeBot";
                     
                 if (root.TryGetProperty("ProcessPath", out var processPath))
                     instance.ProcessPath = processPath.GetString();
@@ -1423,7 +1517,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
             {
                 var sendAllMethod = _mainForm.GetType().GetMethod(methodName,
                     BindingFlags.NonPublic | BindingFlags.Instance);
-                sendAllMethod?.Invoke(_mainForm, new object[] { command });
+                sendAllMethod?.Invoke(_mainForm, [command]);
             }
         }));
     }
@@ -1432,15 +1526,15 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
     {
         return webCommand.ToLower() switch
         {
-            "start" => WebApi.BotControlCommand.Start,
-            "stop" => WebApi.BotControlCommand.Stop,
-            "idle" => WebApi.BotControlCommand.Idle,
-            "resume" => WebApi.BotControlCommand.Resume,
-            "restart" => WebApi.BotControlCommand.Restart,
-            "reboot" => WebApi.BotControlCommand.RebootAndStop,
-            "screenon" => WebApi.BotControlCommand.ScreenOnAll,
-            "screenoff" => WebApi.BotControlCommand.ScreenOffAll,
-            _ => WebApi.BotControlCommand.None
+            "start" => BotControlCommand.Start,
+            "stop" => BotControlCommand.Stop,
+            "idle" => BotControlCommand.Idle,
+            "resume" => BotControlCommand.Resume,
+            "restart" => BotControlCommand.Restart,
+            "reboot" => BotControlCommand.RebootAndStop,
+            "screenon" => BotControlCommand.ScreenOnAll,
+            "screenoff" => BotControlCommand.ScreenOffAll,
+            _ => BotControlCommand.None
         };
     }
 
@@ -1501,78 +1595,22 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
 
     private List<BotController> GetBotControllers()
     {
-        try
+        var flpBotsField = _mainForm.GetType().GetField("FLP_Bots",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+        if (flpBotsField?.GetValue(_mainForm) is FlowLayoutPanel flpBots)
         {
-            var results = new List<BotController>();
-
-            var type = _mainForm.GetType();
-            var flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-
-            // 1) Try direct field named FLP_Bots (legacy)
-            var flpField = type.GetField("FLP_Bots", flags);
-            if (flpField?.GetValue(_mainForm) is FlowLayoutPanel flp1)
-                results.AddRange(flp1.Controls.OfType<BotController>());
-
-            // 2) Scan all fields/properties on Main for FlowLayoutPanel
-            foreach (var f in type.GetFields(flags))
-            {
-                if (typeof(FlowLayoutPanel).IsAssignableFrom(f.FieldType) && f.GetValue(_mainForm) is FlowLayoutPanel flp)
-                    results.AddRange(flp.Controls.OfType<BotController>());
-            }
-
-            foreach (var p in type.GetProperties(flags))
-            {
-                if (typeof(FlowLayoutPanel).IsAssignableFrom(p.PropertyType))
-                {
-                    try
-                    {
-                        if (p.GetValue(_mainForm) is FlowLayoutPanel flpProp)
-                            results.AddRange(flpProp.Controls.OfType<BotController>());
-                    }
-                    catch { /* ignore property getters with side effects */ }
-                }
-            }
-
-            // 3) Try the common pattern: a private field/property _botsForm that contains BotPanel
-            var botsFormField = type.GetField("_botsForm", flags) ?? (MemberInfo?)type.GetProperty("_botsForm", flags);
-            if (botsFormField != null)
-            {
-                object? botsFormObj = null;
-                if (botsFormField is FieldInfo fi) botsFormObj = fi.GetValue(_mainForm);
-                else if (botsFormField is PropertyInfo pi) botsFormObj = pi.GetValue(_mainForm);
-                if (botsFormObj != null)
-                {
-                    var botPanelProp = botsFormObj.GetType().GetProperty("BotPanel", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (botPanelProp?.GetValue(botsFormObj) is FlowLayoutPanel botPanel)
-                        results.AddRange(botPanel.Controls.OfType<BotController>());
-                }
-            }
-
-            // Final: dedupe and return
-            return results.Distinct().ToList();
+            return [.. flpBots.Controls.OfType<BotController>()];
         }
-        catch (Exception ex)
-        {
-            LogUtil.LogError($"GetBotControllers failed: {ex.Message}", "WebServer");
-            return new List<BotController>();
-        }
+
+        return [];
     }
 
     private ProgramConfig? GetConfig()
     {
-        var type = _mainForm.GetType();
-
-        // Try a static property first (Main.Config is public static in your Main)
-        var staticProp = type.GetProperty("Config", BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
-        if (staticProp != null)
-            return staticProp.GetValue(null) as ProgramConfig;
-
-        // Fallback: try instance property
-        var instProp = type.GetProperty("Config", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        if (instProp != null)
-            return instProp.GetValue(_mainForm) as ProgramConfig;
-
-        return null;
+        var configProp = _mainForm.GetType().GetProperty("Config",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        return configProp?.GetValue(_mainForm) as ProgramConfig;
     }
 
     private static string GetBotName(PokeBotState state, ProgramConfig? _)
@@ -1661,7 +1699,8 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
     private bool IsMasterInstance()
     {
         // Master is the instance hosting the web server on the configured control panel port
-        var configuredPort = Main.Config?.Hub?.WebServer?.ControlPanelPort ?? 8080;
+        var config = GetConfig();
+        var configuredPort = config?.Hub?.WebServer?.ControlPanelPort ?? 8080;
         return _port == configuredPort;
     }
     
@@ -1699,7 +1738,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
             if (currentState != null)
             {
                 // Check if master instance actually updated
-                var currentVersion = SysBot.Pokemon.PokeBot.Version;
+                var currentVersion = PokeBot.Version;
                 LogUtil.LogInfo($"Checking session state: current={currentVersion}, target={currentState.TargetVersion}, isComplete={currentState.IsComplete}", "WebServer");
                 
                 // If version matches target, force complete regardless of what the state says
