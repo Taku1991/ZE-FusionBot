@@ -110,9 +110,6 @@ jobs:
         with:
           name: ZEFusionBot
           path: ./publish
-      - name: Rename executable
-        run: |
-          mv ./publish/ZE_FusionBot.exe ./publish/FusionBot.exe
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -121,7 +118,7 @@ jobs:
           body: |
             ## Recent Changes
             ${{ env.RECENT_CHANGES }}
-          files: ./publish/FusionBot.exe
+          files: ./publish/ZE_FusionBot.exe
           draft: false
           prerelease: false
         env:
