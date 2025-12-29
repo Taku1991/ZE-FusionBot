@@ -63,6 +63,9 @@ public class DiscordSettings
     [Category(Startup), Description("Bot login token."), DisplayName("Discord Bot Token")]
     public string Token { get; set; } = string.Empty;
 
+    [Category(Startup), Description("Guild ID for slash command registration. If empty or 0, commands will be registered globally (takes up to 1 hour). If set, commands register instantly but only work on that specific server."), DisplayName("Slash Command Guild ID")]
+    public ulong SlashCommandGuildId { get; set; } = 0;
+
     [Category(Operation), Description("Additional text to add to the beginning of the embed description."), DisplayName("Additional Embed Text")]
     public string[] AdditionalEmbedText { get; set; } = [];
 

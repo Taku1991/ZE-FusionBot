@@ -359,15 +359,23 @@ public class PokeTradeBotPLZA(PokeTradeHub<PA9> Hub, PokeBotState Config) : Poke
 
         var tradeSV = new LegalityAnalysis(cln);
 
+        Log($"[AutoOT Legality] Valid: {tradeSV.Valid}");
+        if (!tradeSV.Valid)
+        {
+            Log($"[AutoOT Legality] Report:\n{tradeSV.Report()}");
+        }
+
         if (tradeSV.Valid)
         {
             // Don't pass sav - we've already set handler info and don't want UpdateHandler to overwrite it
             var boxOffset = await GetBoxStartOffset(token).ConfigureAwait(false);
             await SetBoxPokemonAbsolute(boxOffset, cln, token, null).ConfigureAwait(false);
+            Log($"[AutoOT Success] Modified Pokemon written to box. OT: {cln.OriginalTrainerName}, TID: {cln.DisplayTID}, SID: {cln.DisplaySID}");
             return cln;
         }
         else
         {
+            Log($"[AutoOT Failed] Legality check failed. Returning original Pokemon.");
             if (toSend.Species != 0)
             {
                 var boxOffset = await GetBoxStartOffset(token).ConfigureAwait(false);
@@ -892,6 +900,8 @@ public class PokeTradeBotPLZA(PokeTradeHub<PA9> Hub, PokeBotState Config) : Poke
                             token).ConfigureAwait(false);
 
                         poke.TradeData = tradesToProcess[0];
+
+                        // Note: ApplyAutoOT already writes the Pokemon to the box
                         await Task.Delay(3_000, token).ConfigureAwait(false);
                     }
                 }
@@ -989,13 +999,17 @@ public class PokeTradeBotPLZA(PokeTradeHub<PA9> Hub, PokeBotState Config) : Poke
                             token).ConfigureAwait(false);
 
                         tradesToProcess[i + 1] = next;
+                        // Note: ApplyAutoOT already writes to box
                     }
-
-                    await SetBoxPokemonAbsolute(
-                        await GetBoxStartOffset(token).ConfigureAwait(false),
-                        next,
-                        token,
-                        sav).ConfigureAwait(false);
+                    else
+                    {
+                        // Only write if AutoOT didn't run
+                        await SetBoxPokemonAbsolute(
+                            await GetBoxStartOffset(token).ConfigureAwait(false),
+                            next,
+                            token,
+                            sav).ConfigureAwait(false);
+                    }
                 }
             }
 
@@ -1364,11 +1378,19 @@ public class PokeTradeBotPLZA(PokeTradeHub<PA9> Hub, PokeBotState Config) : Poke
             return result;
         }
 
+        Log($"[AutoOT Debug] UseTradePartnerInfo: {Hub.Config.Legality.UseTradePartnerInfo}, IgnoreAutoOT: {poke.IgnoreAutoOT}, CanUseAutoOT: {PokeBot.CanUseAutoOT(poke)}");
         if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
         {
+            Log($"Applying AutoOT: Changing OT from '{toSend.OriginalTrainerName}' to '{tradePartnerFullInfo.OT}'");
             toSend = await ApplyAutoOT(toSend, tradePartnerFullInfo, sav, token);
+            Log($"AutoOT Applied: New OT is '{toSend.OriginalTrainerName}', TID: {toSend.DisplayTID}, SID: {toSend.DisplaySID}");
+            // Note: ApplyAutoOT already writes the Pokemon to the box, so we don't need to do it again
             // Give game time to refresh trade offer display with AutoOT Pokemon
             await Task.Delay(3_000, token).ConfigureAwait(false);
+        }
+        else
+        {
+            Log("AutoOT skipped - condition not met");
         }
 
         SpecialTradeType itemReq = SpecialTradeType.None;

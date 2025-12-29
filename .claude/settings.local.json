@@ -6,7 +6,8 @@
       "Bash(dotnet clean:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(paste:*)"
+      "Bash(paste:*)",
+      "Bash(dotnet publish:*)"
     ]
   }
 }

@@ -1,5 +1,6 @@
 using Discord;
 using Discord.Commands;
+using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using PKHeX.Core;
@@ -15,6 +16,8 @@ using System.Threading.Tasks;
 using static Discord.GatewayIntents;
 using static SysBot.Pokemon.DiscordSettings;
 using Discord.Net;
+using CommandsRunMode = Discord.Commands.RunMode;
+using InteractionsRunMode = Discord.Interactions.RunMode;
 
 namespace SysBot.Pokemon.Discord;
 
@@ -34,6 +37,7 @@ public sealed partial class SysCord<T> where T : PKM, new()
     private readonly Dictionary<ulong, ulong> _announcementMessageIds = [];
     private readonly DiscordSocketClient _client;
     private readonly CommandService _commands;
+    private readonly InteractionService _interactions;
     private readonly HashSet<ITradeBot> _connectedBots = [];
     private readonly object _botConnectionLock = new object();
 
@@ -153,16 +157,24 @@ public sealed partial class SysCord<T> where T : PKM, new()
             // Again, log level:
             LogLevel = LogSeverity.Info,
 
-            DefaultRunMode = RunMode.Async,
+            DefaultRunMode = CommandsRunMode.Async,
 
             // There's a few more properties you can set,
             // for example, case-insensitive commands.
             CaseSensitiveCommands = false,
         });
 
+        // Initialize InteractionService for Slash Commands
+        _interactions = new InteractionService(_client, new InteractionServiceConfig
+        {
+            LogLevel = LogSeverity.Info,
+            DefaultRunMode = InteractionsRunMode.Async,
+        });
+
         // Subscribe the logging handler to both the client and the CommandService.
         _client.Log += Log;
         _commands.Log += Log;
+        _interactions.Log += Log;
 
         // Setup your DI container.
         _services = ConfigureServices();
@@ -462,6 +474,7 @@ public sealed partial class SysCord<T> where T : PKM, new()
         // Subscribe a handler to see if a message invokes a command.
         _client.Ready += LoadLoggingAndEcho;
         _client.MessageReceived += HandleMessageAsync;
+        _client.InteractionCreated += HandleInteractionAsync;
     }
 
     public async Task MainAsync(string apiToken, CancellationToken token)
@@ -740,6 +753,9 @@ public sealed partial class SysCord<T> where T : PKM, new()
         var game = Hub.Config.Discord.BotGameStatus;
         if (!string.IsNullOrWhiteSpace(game))
             await _client.SetGameAsync(game).ConfigureAwait(false);
+
+        // Register Slash Commands
+        await RegisterSlashCommandsAsync().ConfigureAwait(false);
     }
 
     private async Task MonitorStatusAsync(CancellationToken token)
@@ -861,4 +877,104 @@ public sealed partial class SysCord<T> where T : PKM, new()
             await Log(new LogMessage(LogSeverity.Error, "Command", $"Error sending message: {ex.Message}", ex)).ConfigureAwait(false);
         }
     }
+
+    #region Slash Commands (Interactions)
+
+    private async Task RegisterSlashCommandsAsync()
+    {
+        try
+        {
+            await Log(new LogMessage(LogSeverity.Info, "Slash Commands", "Loading slash command modules...")).ConfigureAwait(false);
+
+            // Load all interaction modules from the assembly
+            var assembly = Assembly.GetExecutingAssembly();
+            await _interactions.AddModulesAsync(assembly, _services).ConfigureAwait(false);
+
+            // Manually add generic interaction modules with the specific type T
+            foreach (var t in assembly.DefinedTypes.Where(z => z.IsSubclassOf(typeof(InteractionModuleBase<SocketInteractionContext>)) && z.IsGenericType))
+            {
+                var genModule = t.MakeGenericType(typeof(T));
+                await _interactions.AddModuleAsync(genModule, _services).ConfigureAwait(false);
+            }
+
+            // Register slash commands either globally or to a specific guild
+            var guildId = SysCordSettings.Settings.SlashCommandGuildId;
+            if (guildId != 0)
+            {
+                // Guild-specific registration (instant, but only works on that server)
+                await _interactions.RegisterCommandsToGuildAsync(guildId).ConfigureAwait(false);
+                await Log(new LogMessage(LogSeverity.Info, "Slash Commands", $"Registered {_interactions.Modules.Count()} slash command module(s) to guild {guildId} (instant)")).ConfigureAwait(false);
+            }
+            else
+            {
+                // Global registration (takes up to 1 hour, but works on all servers)
+                await _interactions.RegisterCommandsGloballyAsync().ConfigureAwait(false);
+                await Log(new LogMessage(LogSeverity.Info, "Slash Commands", $"Registered {_interactions.Modules.Count()} slash command module(s) globally (may take up to 1 hour)")).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Log(new LogMessage(LogSeverity.Error, "Slash Commands", $"Failed to register slash commands: {ex.Message}", ex)).ConfigureAwait(false);
+        }
+    }
+
+    private async Task HandleInteractionAsync(SocketInteraction interaction)
+    {
+        try
+        {
+            // Create an execution context that matches the generic type parameter of your InteractionModuleBase<T> modules
+            var context = new SocketInteractionContext(_client, interaction);
+
+            // Execute the incoming command
+            var result = await _interactions.ExecuteCommandAsync(context, _services).ConfigureAwait(false);
+
+            // Handle errors
+            if (!result.IsSuccess)
+            {
+                switch (result.Error)
+                {
+                    case InteractionCommandError.UnmetPrecondition:
+                        await Log(new LogMessage(LogSeverity.Warning, "Interaction", $"Unmet precondition: {result.ErrorReason}")).ConfigureAwait(false);
+                        break;
+                    case InteractionCommandError.UnknownCommand:
+                        await Log(new LogMessage(LogSeverity.Warning, "Interaction", "Unknown command")).ConfigureAwait(false);
+                        break;
+                    case InteractionCommandError.BadArgs:
+                        await Log(new LogMessage(LogSeverity.Warning, "Interaction", $"Invalid arguments: {result.ErrorReason}")).ConfigureAwait(false);
+                        break;
+                    case InteractionCommandError.Exception:
+                        await Log(new LogMessage(LogSeverity.Error, "Interaction", $"Command exception: {result.ErrorReason}")).ConfigureAwait(false);
+                        break;
+                    case InteractionCommandError.Unsuccessful:
+                        await Log(new LogMessage(LogSeverity.Error, "Interaction", $"Command execution failed: {result.ErrorReason}")).ConfigureAwait(false);
+                        break;
+                    default:
+                        await Log(new LogMessage(LogSeverity.Error, "Interaction", $"Error: {result.ErrorReason}")).ConfigureAwait(false);
+                        break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await Log(new LogMessage(LogSeverity.Error, "Interaction", $"Exception handling interaction: {ex.Message}", ex)).ConfigureAwait(false);
+
+            // If a Slash Command execution fails, it's most likely the case of an error being thrown
+            if (interaction.Type == InteractionType.ApplicationCommand)
+            {
+                try
+                {
+                    if (interaction.HasResponded)
+                        await interaction.FollowupAsync("An error occurred while processing your command.", ephemeral: true).ConfigureAwait(false);
+                    else
+                        await interaction.RespondAsync("An error occurred while processing your command.", ephemeral: true).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Ignore if we can't respond
+                }
+            }
+        }
+    }
+
+    #endregion
 }

@@ -359,3 +359,6 @@ PokeBot/
 
 # Claude
 .claude/
+
+# Test Files
+/Test_Releaese/

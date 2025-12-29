@@ -1,0 +1,61 @@
+using Discord.Interactions;
+using Discord.WebSocket;
+using PKHeX.Core;
+using SysBot.Pokemon.Discord.Commands.Bots.Autocomplete;
+using System.Threading.Tasks;
+
+namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
+
+/// <summary>
+/// Slash command module for creating Let's Go Pikachu/Eevee (PB7) Pokemon
+/// </summary>
+public class CreatePokemonLGPEModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
+{
+    [SlashCommand("create-lgpe", "Create a Let's Go Pikachu/Eevee Pokemon")]
+    public async Task CreatePokemonLGPEAsync(
+        [Summary("pokemon", "Pokemon species")]
+        [Autocomplete(typeof(PokemonAutocompleteLGPEHandler))]
+        string pokemon,
+
+        [Summary("shiny", "Should the Pokemon be shiny?")]
+        bool shiny = false,
+
+        [Summary("item", "Held item (optional)")]
+        [Autocomplete(typeof(ItemAutocompleteLGPEHandler))]
+        string? item = null,
+
+        [Summary("ball", "Poke Ball (optional)")]
+        [Autocomplete(typeof(BallAutocompleteHandler))]
+        string? ball = null,
+
+        [Summary("level", "Pokemon level (1-100)")]
+        [MinValue(1)]
+        [MaxValue(100)]
+        int level = 100,
+
+        [Summary("nature", "Pokemon nature (optional)")]
+        string? nature = null
+    )
+    {
+        await DeferAsync(ephemeral: false).ConfigureAwait(false);
+
+        try
+        {
+            await CreatePokemonHelper.ExecuteCreatePokemonAsync<T>(
+                Context,
+                pokemon,
+                shiny,
+                item,
+                ball,
+                level,
+                nature,
+                string.Empty, // No special features
+                null
+            ).ConfigureAwait(false);
+        }
+        catch (System.Exception ex)
+        {
+            await FollowupAsync($"❌ An error occurred: {ex.Message}", ephemeral: true).ConfigureAwait(false);
+        }
+    }
+}

@@ -1,0 +1,223 @@
+using Discord;
+using Discord.Interactions;
+using Discord.WebSocket;
+using PKHeX.Core;
+using PKHeX.Core.AutoMod;
+using SysBot.Base;
+using SysBot.Pokemon.Discord.Commands.Bots.Autocomplete;
+using SysBot.Pokemon.Discord.Helpers;
+using SysBot.Pokemon.Discord.Helpers.TradeModule;
+using SysBot.Pokemon.Helpers;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using DiscordColor = Discord.Color;
+
+namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
+
+/// <summary>
+/// Slash command module for creating and trading Pokemon with simplified parameters
+/// </summary>
+public class CreatePokemonModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
+{
+    private static TradeQueueInfo<T> Info => SysCord<T>.Runner.Hub.Queues.Info;
+
+    [SlashCommand("create", "Create and trade a Pokemon with custom parameters")]
+    public async Task CreatePokemonAsync(
+        [Summary("pokemon", "Pokemon species")]
+        [Autocomplete(typeof(PokemonAutocompleteHandler))]
+        string pokemon,
+
+        [Summary("shiny", "Should the Pokemon be shiny?")]
+        bool shiny = false,
+
+        [Summary("item", "Held item (optional)")]
+        [Autocomplete(typeof(ItemAutocompleteHandler))]
+        string? item = null,
+
+        [Summary("ball", "Poke Ball (optional)")]
+        [Autocomplete(typeof(BallAutocompleteHandler))]
+        string? ball = null,
+
+        [Summary("alpha", "Should the Pokemon be Alpha? (PLA/PLZA only)")]
+        bool alpha = false,
+
+        [Summary("level", "Pokemon level (1-100)")]
+        [MinValue(1)]
+        [MaxValue(100)]
+        int level = 100,
+
+        [Summary("nature", "Pokemon nature (optional)")]
+        string? nature = null
+    )
+    {
+        await DeferAsync(ephemeral: false).ConfigureAwait(false);
+
+        try
+        {
+            // Debug: Log all parameters to bot console
+            var debugMsg = $"[/create Debug] Pokemon='{pokemon ?? "null"}', Shiny={shiny}, Item='{item ?? "null"}', Ball='{ball ?? "null"}', Alpha={alpha}, Level={level}, Nature='{nature ?? "null"}'";
+            Base.LogUtil.LogInfo(debugMsg, "Discord");
+
+            // Validate pokemon parameter is not null or empty
+            if (string.IsNullOrWhiteSpace(pokemon))
+            {
+                await FollowupAsync($"❌ Pokemon parameter is empty! Please use autocomplete to select a valid Pokemon.", ephemeral: true).ConfigureAwait(false);
+                return;
+            }
+
+            // Parse Pokemon species
+            if (!Enum.TryParse<Species>(pokemon, true, out var species) || species <= 0)
+            {
+                await FollowupAsync($"❌ Invalid Pokemon: **{pokemon}**. Please use autocomplete to select a valid Pokemon.", ephemeral: true).ConfigureAwait(false);
+                return;
+            }
+
+            // Build Showdown format string using the species name from the enum for consistency
+            // IMPORTANT: Showdown format order matters!
+            // Line 1: PokemonName @ Item (if item specified)
+            // Line 2: Nature Nature (if nature specified) - MUST come before stats
+            // Then: Level, Ball, IVs, Shiny
+            var speciesName = species.ToString();
+            var showdownBuilder = new StringBuilder();
+
+            // Line 1: Pokemon @ Item (Showdown format)
+            if (!string.IsNullOrWhiteSpace(item))
+                showdownBuilder.AppendLine($"{speciesName} @ {item}");
+            else
+                showdownBuilder.AppendLine(speciesName);
+
+            // Line 2: Nature (MUST come before stats in Showdown format)
+            if (!string.IsNullOrWhiteSpace(nature))
+                showdownBuilder.AppendLine($"{nature} Nature");
+
+            // Stats and other properties
+            showdownBuilder.AppendLine($"Level: {level}");
+
+            if (!string.IsNullOrWhiteSpace(ball))
+                showdownBuilder.AppendLine($"Ball: {ball}");
+
+            showdownBuilder.AppendLine("IVs: 31/31/31/31/31/31"); // Always 6 IVs
+
+            if (shiny)
+                showdownBuilder.AppendLine("Shiny: Yes");
+
+            if (alpha)
+                showdownBuilder.AppendLine("Alpha: Yes");
+
+            var showdownText = showdownBuilder.ToString();
+
+            // Get user roles for AutoOT permission check
+            IEnumerable<string>? userRoles = null;
+            if (Context.User is SocketGuildUser gUser)
+            {
+                userRoles = gUser.Roles.Select(z => z.Name);
+            }
+
+            // Use the standard trade processing flow (this handles AutoOT, IVs, language, nature, etc.)
+            var processed = await Helpers<T>.ProcessShowdownSetAsync(showdownText, ignoreAutoOT: false, userRoles).ConfigureAwait(false);
+
+            if (!string.IsNullOrEmpty(processed.Error) || processed.Pokemon == null)
+            {
+                var errorMsg = processed.Error ?? "Unknown error occurred during Pokemon generation.";
+                await FollowupAsync($"❌ {errorMsg}", ephemeral: true).ConfigureAwait(false);
+                return;
+            }
+
+            var pk = processed.Pokemon;
+
+            // Generate trade code
+            var code = Info.GetRandomTradeCode(Context.User.Id);
+            var sig = RequestSignificance.None;
+            var userID = Context.User.Id;
+
+            // Create trade detail
+            var trainer_info = new PokeTradeTrainerInfo(Context.User.Username, userID);
+            var notifier = new DiscordTradeNotifier<T>(pk, trainer_info, code, Context.User, 1, 1, false, lgcode: processed.LgCode ?? []);
+
+            // Generate unique trade ID
+            long timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            int uniqueTradeID = (int)(timestamp & 0x7FFFFFFF);
+
+            // Note: ignoreAutoOT is set to false so users WITH the AutoOT role will get their trainer data applied
+            var detail = new PokeTradeDetail<T>(pk, trainer_info, notifier, PokeTradeType.Specific, code,
+                sig == RequestSignificance.Favored, null, 1, 1, false, false, uniqueTradeID, ignoreAutoOT: false);
+
+            var trade = new TradeEntry<T>(detail, userID, PokeRoutineType.LinkTrade, Context.User.Username, uniqueTradeID);
+
+            // Add to queue
+            var added = Info.AddToTradeQueue(trade, userID, false, sig == RequestSignificance.Owner);
+
+            if (added == QueueResultAdd.AlreadyInQueue)
+            {
+                await FollowupAsync("❌ You are already in the queue!", ephemeral: true).ConfigureAwait(false);
+                return;
+            }
+
+            if (added == QueueResultAdd.QueueFull)
+            {
+                await FollowupAsync("❌ The queue is currently full. Please try again later.", ephemeral: true).ConfigureAwait(false);
+                return;
+            }
+
+            // Send trade code embed via DM
+            await EmbedHelper.SendTradeCodeEmbedAsync(Context.User, code).ConfigureAwait(false);
+
+            // Build channel embed using the same system as normal trades
+            var embedData = DetailsExtractor<T>.ExtractPokemonDetails(
+                pk, Context.User, false, false, false, false, false, false, 1, 1
+            );
+
+            (string embedImageUrl, DiscordColor embedColor) = await QueueHelper<T>.PrepareEmbedDetails(pk).ConfigureAwait(false);
+            embedData.EmbedImageUrl = embedImageUrl;
+
+            embedData.HeldItemUrl = string.Empty;
+            if (!string.IsNullOrWhiteSpace(embedData.HeldItem))
+            {
+                string heldItemName = embedData.HeldItem.ToLower().Replace(" ", "");
+                embedData.HeldItemUrl = $"https://serebii.net/itemdex/sprites/{heldItemName}.png";
+            }
+
+            embedData.IsLocalFile = System.IO.File.Exists(embedData.EmbedImageUrl);
+
+            var position = Info.CheckPosition(userID, uniqueTradeID, PokeRoutineType.LinkTrade);
+            var botct = Info.Hub.Bots.Count;
+            var baseEta = position.Position > botct ? Info.Hub.Config.Queues.EstimateDelay(position.Position, botct) : 0;
+            var etaMessage = $"Wait Estimate: {baseEta:F1} min(s) for trade.";
+            string footerText = $"Current Queue Position: {(position.Position == -1 ? 1 : position.Position)}";
+            footerText += $"\n{etaMessage}";
+            footerText += $"\nZE FusionBot {PokeBot.Version}";
+
+            var embedBuilder = new EmbedBuilder()
+                .WithColor(embedColor)
+                .WithImageUrl(embedData.IsLocalFile ? $"attachment://{System.IO.Path.GetFileName(embedData.EmbedImageUrl)}" : embedData.EmbedImageUrl)
+                .WithFooter(footerText)
+                .WithAuthor(new EmbedAuthorBuilder()
+                    .WithName(embedData.AuthorName)
+                    .WithIconUrl(Context.User.GetAvatarUrl() ?? Context.User.GetDefaultAvatarUrl())
+                    .WithUrl("https://hideoutpk.de"));
+
+            DetailsExtractor<T>.AddAdditionalText(embedBuilder);
+            DetailsExtractor<T>.AddNormalTradeFields(embedBuilder, embedData, Context.User.Mention, pk);
+            DetailsExtractor<T>.AddThumbnails(embedBuilder, false, false, embedData.HeldItemUrl);
+
+            var embed = embedBuilder.Build();
+
+            if (embedData.IsLocalFile)
+            {
+                await Context.Channel.SendFileAsync(embedData.EmbedImageUrl, embed: embed).ConfigureAwait(false);
+                await QueueHelper<T>.ScheduleFileDeletion(embedData.EmbedImageUrl, 0).ConfigureAwait(false);
+            }
+            else
+            {
+                await FollowupAsync(embed: embed).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            await FollowupAsync($"❌ An error occurred: {ex.Message}", ephemeral: true).ConfigureAwait(false);
+        }
+    }
+}

@@ -1025,6 +1025,7 @@ public class PokeTradeBotBS : PokeRoutineExecutor8BS, ICountBot, ITradeBot, IDis
         if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
         {
             toSend = await ApplyAutoOT(toSend, sav, tradePartner?.TrainerName ?? string.Empty, (uint)tid, (uint)sid, token);
+            // Note: ApplyAutoOT already writes the Pokemon to the box
         }
 
         await Task.Delay(2_000, token).ConfigureAwait(false);
@@ -1286,8 +1287,13 @@ public class PokeTradeBotBS : PokeRoutineExecutor8BS, ICountBot, ITradeBot, IDis
                     {
                         toSend = await ApplyAutoOT(toSend, sav, cachedTradePartner.TrainerName, cachedTID, cachedSID, token);
                         tradesToProcess[currentTradeIndex] = toSend; // Update the list
+                        // Note: ApplyAutoOT already writes to box
                     }
-                    await SetBoxPokemonAbsolute(BoxStartOffset, toSend, token, sav).ConfigureAwait(false);
+                    else
+                    {
+                        // Only write if AutoOT didn't run
+                        await SetBoxPokemonAbsolute(BoxStartOffset, toSend, token, sav).ConfigureAwait(false);
+                    }
                 }
 
                 // Give time for the Pokemon to be properly set

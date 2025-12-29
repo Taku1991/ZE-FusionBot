@@ -510,7 +510,7 @@ public static class QueueHelper<T> where T : PKM, new()
         return filePath;
     }
 
-    private static async Task<(string, DiscordColor)> PrepareEmbedDetails(T pk)
+    public static async Task<(string, DiscordColor)> PrepareEmbedDetails(T pk)
     {
         string embedImageUrl;
         string speciesImageUrl;
@@ -690,7 +690,7 @@ public static class QueueHelper<T> where T : PKM, new()
         }
     }
 
-    private static async Task ScheduleFileDeletion(string filePath, int delayInMilliseconds)
+    public static async Task ScheduleFileDeletion(string filePath, int delayInMilliseconds)
     {
         await Task.Delay(delayInMilliseconds);
         DeleteFile(filePath);
@@ -920,9 +920,9 @@ public static class QueueHelper<T> where T : PKM, new()
     private static string CreateBatchSpriteImage<T>(List<T> pokemonList) where T : PKM, new()
     {
 #pragma warning disable CA1416 // Validate platform compatibility
-        const int spriteWidth = 68;  // Width for each Pokemon sprite
-        const int spriteHeight = 56; // Height for each Pokemon sprite
-        const int spacing = 2;       // Spacing between sprites
+        const int spriteWidth = 91;  // Width for each Pokemon sprite
+        const int spriteHeight = 75; // Height for each Pokemon sprite
+        const int spacing = 3;       // Spacing between sprites
 
         int totalWidth = (pokemonList.Count * spriteWidth) + ((pokemonList.Count - 1) * spacing);
         int totalHeight = spriteHeight;
