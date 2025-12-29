@@ -392,97 +392,80 @@ public static class QueueHelper<T> where T : PKM, new()
         // Send initial batch summary message
         await context.Channel.SendMessageAsync($"{trader.Mention} - Added batch trade with {totalBatchTrades} Pokémon to the queue! Position: {position.Position}. Estimated: {baseEta:F1} min(s).").ConfigureAwait(false);
 
-        // Create and send embeds for each Pokémon in the batch
+        // Create and send a single combined embed for the entire batch
         if (SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.UseEmbeds)
         {
-            for (int i = 0; i < allTrades.Count; i++)
+            try
             {
-                var pk = allTrades[i];
-                var batchTradeNumber = i + 1;
+                // Create combined sprite image
+                string spriteImagePath = CreateBatchSpriteImage(allTrades);
 
-                // Extract details for this Pokémon
-                var embedData = DetailsExtractor<T>.ExtractPokemonDetails(
-                    pk, trader, false, false, false, false, false, true, batchTradeNumber, totalBatchTrades
-                );
+                // Build Pokemon list for description
+                var pokemonList = new System.Text.StringBuilder();
+                string maleEmojiString = SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.MaleEmoji.EmojiString;
+                string femaleEmojiString = SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.FemaleEmoji.EmojiString;
 
-                try
+                for (int i = 0; i < allTrades.Count; i++)
                 {
-                    // Prepare embed details
-                    (string embedImageUrl, DiscordColor embedColor) = await PrepareEmbedDetails(pk);
+                    var pk = allTrades[i];
+                    string speciesName = SpeciesName.GetSpeciesName(pk.Species, 2);
 
-                    embedData.EmbedImageUrl = embedImageUrl;
-                    embedData.HeldItemUrl = string.Empty;
-                    if (!string.IsNullOrWhiteSpace(embedData.HeldItem))
+                    // Use configured emojis or fallback to unicode symbols
+                    string genderSymbol = pk.Gender switch
                     {
-                        string heldItemName = embedData.HeldItem.ToLower().Replace(" ", "");
-                        embedData.HeldItemUrl = $"https://serebii.net/itemdex/sprites/{heldItemName}.png";
-                    }
+                        0 => !string.IsNullOrEmpty(maleEmojiString) ? $" {maleEmojiString}" : " ♂",
+                        1 => !string.IsNullOrEmpty(femaleEmojiString) ? $" {femaleEmojiString}" : " ♀",
+                        _ => ""
+                    };
 
-                    embedData.IsLocalFile = File.Exists(embedData.EmbedImageUrl);
-
-                    // Build footer text with batch info
-                    string footerText = $"Batch Trade {batchTradeNumber} of {totalBatchTrades}";
-                    if (i == 0) // Only show position and ETA on first embed
-                    {
-                        footerText += $" | Current Queue Position: {position.Position}";
-                        string trainerMention = trader.Mention;
-                        string userDetailsText = DetailsExtractor<T>.GetUserDetails(totalTradeCount, tradeDetails, trainerMention);
-
-                        if (!string.IsNullOrEmpty(userDetailsText))
-                        {
-                            footerText += $"\n{userDetailsText}";
-                        }
-                        footerText += $"\nWait Estimate: {baseEta:F1} min(s) for batch";
-                    }
-
-                    // Create embed
-                    var embedBuilder = new EmbedBuilder()
-                        .WithColor(embedColor)
-                        .WithImageUrl(embedData.IsLocalFile ? $"attachment://{Path.GetFileName(embedData.EmbedImageUrl)}" : embedData.EmbedImageUrl)
-                        .WithFooter(footerText)
-                        .WithAuthor(new EmbedAuthorBuilder()
-                            .WithName(embedData.AuthorName)
-                            .WithIconUrl(trader.GetAvatarUrl() ?? trader.GetDefaultAvatarUrl())
-                            .WithUrl("https://hideoutpk.de"));
-
-                    DetailsExtractor<T>.AddAdditionalText(embedBuilder);
-                    DetailsExtractor<T>.AddNormalTradeFields(embedBuilder, embedData, trader.Mention, pk);
-
-                    // Check for Non-Native and Home Tracker
-                    if (pk is IHomeTrack homeTrack)
-                    {
-                        if (homeTrack.HasTracker)
-                        {
-                            embedBuilder.Footer.IconUrl = "https://raw.githubusercontent.com/hexbyt3/sprites/main/exclamation.gif";
-                            embedBuilder.AddField("**__Notice__**: **Home Tracker Detected.**", "*AutoOT not applied.*");
-                        }
-                    }
-
-                    DetailsExtractor<T>.AddThumbnails(embedBuilder, false, false, embedData.HeldItemUrl);
-
-                    var embed = embedBuilder.Build();
-
-                    // Send embed
-                    if (embedData.IsLocalFile)
-                    {
-                        await context.Channel.SendFileAsync(embedData.EmbedImageUrl, embed: embed);
-                        await ScheduleFileDeletion(embedData.EmbedImageUrl, 0);
-                    }
-                    else
-                    {
-                        await context.Channel.SendMessageAsync(embed: embed);
-                    }
-
-                    // Small delay between embeds to avoid rate limiting
-                    if (i < allTrades.Count - 1)
-                    {
-                        await Task.Delay(500);
-                    }
+                    string shinySymbol = pk.IsShiny ? " ✨" : "";
+                    pokemonList.AppendLine($"{i + 1}. {speciesName}{genderSymbol}{shinySymbol}");
                 }
-                catch (HttpException ex)
+
+                // Get OT/TID/SID from first Pokemon
+                var firstPk = allTrades[0];
+                string otInfo = $"OT: {firstPk.OriginalTrainerName} | TID: {firstPk.DisplayTID} | SID: {firstPk.DisplaySID}";
+
+                // Build footer text
+                string trainerMention = trader.Mention;
+                string userDetailsText = DetailsExtractor<T>.GetUserDetails(totalTradeCount, tradeDetails, trainerMention);
+                string footerText = $"Batch Trade: {totalBatchTrades} Pokémon | Position: {position.Position}";
+
+                if (!string.IsNullOrEmpty(userDetailsText))
                 {
-                    await HandleDiscordExceptionAsync(context, trader, ex);
+                    footerText += $"\n{userDetailsText}";
                 }
+                footerText += $"\n{otInfo}";
+                footerText += $"\nEstimated: {baseEta:F1} min(s) for batch";
+
+                // Create embed
+                var embedBuilder = new EmbedBuilder()
+                    .WithColor(DiscordColor.Gold)
+                    .WithTitle($"🎁 Batch Trade - {trainer}")
+                    .WithDescription(pokemonList.ToString())
+                    .WithImageUrl($"attachment://{Path.GetFileName(spriteImagePath)}")
+                    .WithFooter(footerText)
+                    .WithAuthor(new EmbedAuthorBuilder()
+                        .WithName($"Trade Request from {trader.Username}")
+                        .WithIconUrl(trader.GetAvatarUrl() ?? trader.GetDefaultAvatarUrl())
+                        .WithUrl("https://hideoutpk.de"))
+                    .WithTimestamp(DateTimeOffset.Now);
+
+                var embed = embedBuilder.Build();
+
+                // Send embed with sprite image
+                await context.Channel.SendFileAsync(spriteImagePath, embed: embed);
+
+                // Schedule cleanup of temporary sprite image
+                await ScheduleFileDeletion(spriteImagePath, 5);
+            }
+            catch (HttpException ex)
+            {
+                await HandleDiscordExceptionAsync(context, trader, ex);
+            }
+            catch (Exception ex)
+            {
+                await context.Channel.SendMessageAsync($"{trader.Mention} - An error occurred while creating the batch trade embed: {ex.Message}");
             }
         }
 
@@ -929,5 +912,48 @@ public static class QueueHelper<T> where T : PKM, new()
         filename = Path.GetFileName($"{Directory.GetCurrentDirectory()}//finalcode.png");
         Embed returnembed = new EmbedBuilder().WithTitle($"{lgcode[0]}, {lgcode[1]}, {lgcode[2]}").WithImageUrl($"attachment://{filename}").Build();
         return (filename, returnembed);
+    }
+
+    /// <summary>
+    /// Creates a combined sprite image for batch trades showing all Pokemon side by side
+    /// </summary>
+    private static string CreateBatchSpriteImage<T>(List<T> pokemonList) where T : PKM, new()
+    {
+#pragma warning disable CA1416 // Validate platform compatibility
+        const int spriteWidth = 68;  // Width for each Pokemon sprite
+        const int spriteHeight = 56; // Height for each Pokemon sprite
+        const int spacing = 2;       // Spacing between sprites
+
+        int totalWidth = (pokemonList.Count * spriteWidth) + ((pokemonList.Count - 1) * spacing);
+        int totalHeight = spriteHeight;
+
+        Bitmap combinedImage = new(totalWidth, totalHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+        using (Graphics graphics = Graphics.FromImage(combinedImage))
+        {
+            graphics.Clear(System.Drawing.Color.Transparent);
+            graphics.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceOver;
+            graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+            graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+
+            for (int i = 0; i < pokemonList.Count; i++)
+            {
+                var pk = pokemonList[i];
+                var sprite = pk.Sprite();
+
+                int xPosition = i * (spriteWidth + spacing);
+                graphics.DrawImage(sprite, new Rectangle(xPosition, 0, spriteWidth, spriteHeight));
+                sprite.Dispose();
+            }
+        }
+
+        var filename = Path.Combine(Directory.GetCurrentDirectory(), $"batch_trade_{DateTime.Now.Ticks}.png");
+        combinedImage.Save(filename, System.Drawing.Imaging.ImageFormat.Png);
+        combinedImage.Dispose();
+#pragma warning restore CA1416 // Validate platform compatibility
+
+        return filename;
     }
 }
