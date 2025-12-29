@@ -1474,6 +1474,40 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
             }
         }
 
+        // Check if user has AutoOT role permission
+        bool hasAutoOTRole = false;
+        if (SysCordSettings.Manager != null && Context.User is SocketGuildUser gUser)
+        {
+            var roles = gUser.Roles.Select(z => z.Name);
+            hasAutoOTRole = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
+        }
+
+        // Check if the uploaded PKM file already has trainer data set
+        bool hasTrainerData = !string.IsNullOrWhiteSpace(pk.OriginalTrainerName) &&
+                              pk.DisplayTID != 0;
+
+        // If user doesn't have AutoOT role but the file has trainer data, clear it
+        if (!hasAutoOTRole && hasTrainerData)
+        {
+            // Clear trainer data - will be overwritten by AutoOT during trade
+            pk.OriginalTrainerName = string.Empty;
+            pk.TrainerTID7 = 0;
+            pk.TrainerSID7 = 0;
+            pk.DisplayTID = 0;
+            pk.DisplaySID = 0;
+            ignoreAutoOT = false; // Ensure AutoOT will be applied
+        }
+        // If user has AutoOT role and file has trainer data, keep it
+        else if (hasAutoOTRole && hasTrainerData)
+        {
+            ignoreAutoOT = true; // Preserve the uploaded trainer data
+        }
+        // Otherwise, let AutoOT handle it (if enabled)
+        else
+        {
+            ignoreAutoOT = false;
+        }
+
         pk.RefreshChecksum();
 
         // Queue the trade
