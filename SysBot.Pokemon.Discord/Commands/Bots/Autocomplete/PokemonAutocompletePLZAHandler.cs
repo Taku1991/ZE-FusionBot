@@ -80,7 +80,10 @@ public class PokemonAutocompletePLZAHandler : AutocompleteHandler
                     continue;
 
                 var formName = formList.Length > form ? formList[form] : string.Empty;
-                var displayName = BuildDisplayName(name, formName, species);
+                if (ForbiddenForms.IsForbidden(species, form, formName))
+                    continue;
+
+                var displayName = BuildDisplayName(name, formName, species, form);
                 var showdownName = displayName;
                 var value = $"{name}|{form}|{showdownName}";
                 validSpecies.Add((displayName, value));
@@ -90,12 +93,15 @@ public class PokemonAutocompletePLZAHandler : AutocompleteHandler
         return validSpecies.OrderBy(s => s.Display).ToList();
     }
 
-    private static string BuildDisplayName(string baseName, string formName, ushort species)
+    private static string BuildDisplayName(string baseName, string formName, ushort species, byte form)
     {
         if (string.IsNullOrWhiteSpace(formName))
             return baseName;
 
         if (formName.Equals("Normal", StringComparison.OrdinalIgnoreCase))
+            return baseName;
+
+        if (ForbiddenForms.ShouldSuppressSuffix(species, form, formName))
             return baseName;
 
         if (species == (ushort)Species.Basculin && formName.Contains("Striped", StringComparison.OrdinalIgnoreCase))

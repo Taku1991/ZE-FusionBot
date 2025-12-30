@@ -258,7 +258,7 @@ public static class CreatePokemonHelper
         if (embedData.IsLocalFile)
         {
             // First, dismiss the "thinking..." message with an empty followup
-            await context.Interaction.FollowupAsync("ƒo. Pokemon added to queue! Check your DMs for the trade code.", ephemeral: true).ConfigureAwait(false);
+            await context.Interaction.FollowupAsync("✅ Pokemon added to queue! Check your DMs for the trade code.", ephemeral: true).ConfigureAwait(false);
             // Then send the embed with the file in the channel
             await context.Channel.SendFileAsync(embedData.EmbedImageUrl, embed: embed).ConfigureAwait(false);
             await QueueHelper<T>.ScheduleFileDeletion(embedData.EmbedImageUrl, 0).ConfigureAwait(false);
