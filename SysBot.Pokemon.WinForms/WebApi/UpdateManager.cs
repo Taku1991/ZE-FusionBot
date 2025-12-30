@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -1120,12 +1121,27 @@ public static class UpdateManager
                         await File.WriteAllTextAsync(safeFlagPath, flagData, cancellationToken);
                     }
 
+                    // Download and install update automatically without showing UpdateForm
+                    LogUtil.LogInfo($"Downloading update {targetVersion}...", "UpdateManager");
+                    string? downloadUrl = await UpdateChecker.FetchDownloadUrlAsync();
+
+                    if (string.IsNullOrWhiteSpace(downloadUrl))
+                    {
+                        throw new Exception("Failed to fetch download URL from GitHub");
+                    }
+
+                    LogUtil.LogInfo($"Download URL: {downloadUrl}", "UpdateManager");
+                    string tempPath = await DownloadUpdateAsync(downloadUrl, cancellationToken);
+
+                    LogUtil.LogInfo($"Downloaded to: {tempPath}", "UpdateManager");
+                    LogUtil.LogInfo("Installing update and restarting...", "UpdateManager");
+
+                    // Install update on UI thread
                     await Task.Run(() =>
                     {
-                        mainForm?.BeginInvoke((MethodInvoker)(async () =>
+                        mainForm?.BeginInvoke((MethodInvoker)(() =>
                         {
-                            var updateForm = new UpdateForm(false, targetVersion, true);
-                            await updateForm.PerformUpdateAsync();
+                            InstallUpdateAndRestart(tempPath);
                         }));
                     }, cancellationToken);
 
@@ -1595,5 +1611,81 @@ public static class UpdateManager
         }
         
         return 0; // Not found
+    }
+
+    /// <summary>
+    /// Download update from GitHub
+    /// </summary>
+    private static async Task<string> DownloadUpdateAsync(string downloadUrl, CancellationToken cancellationToken)
+    {
+        string tempPath = Path.Combine(Path.GetTempPath(), $"SysBot.Pokemon.WinForms_{Guid.NewGuid()}.exe");
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("User-Agent", "ZE-FusionBot");
+        client.Timeout = TimeSpan.FromMinutes(10); // Large timeout for download
+
+        var response = await client.GetAsync(downloadUrl, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var fileBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        await File.WriteAllBytesAsync(tempPath, fileBytes, cancellationToken);
+
+        return tempPath;
+    }
+
+    /// <summary>
+    /// Install update and restart application
+    /// </summary>
+    private static void InstallUpdateAndRestart(string downloadedFilePath)
+    {
+        try
+        {
+            string currentExePath = Application.ExecutablePath;
+            string applicationDirectory = Path.GetDirectoryName(currentExePath) ?? "";
+            string executableName = Path.GetFileName(currentExePath);
+            string backupPath = Path.Combine(applicationDirectory, $"{executableName}.backup");
+
+            // Create batch file for update process
+            string batchPath = Path.Combine(Path.GetTempPath(), "UpdateSysBot.bat");
+            string batchContent = @$"
+                                        @echo off
+                                        timeout /t 2 /nobreak >nul
+                                        echo Updating SysBot...
+                                        rem Backup current version
+                                        if exist ""{currentExePath}"" (
+                                            if exist ""{backupPath}"" (
+                                                del ""{backupPath}""
+                                            )
+                                            move ""{currentExePath}"" ""{backupPath}""
+                                        )
+                                        rem Install new version
+                                        move ""{downloadedFilePath}"" ""{currentExePath}""
+                                        rem Start new version
+                                        start """" ""{currentExePath}""
+                                        rem Clean up
+                                        del ""%~f0""
+                                        ";
+
+            File.WriteAllText(batchPath, batchContent);
+
+            // Start the update batch file
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = batchPath,
+                CreateNoWindow = true,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+
+            Process.Start(startInfo);
+
+            // Exit the current instance
+            Application.Exit();
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to install update: {ex.Message}", "UpdateManager");
+            throw;
+        }
     }
 }
