@@ -20,9 +20,10 @@ public class CreatePokemonLGPEModule<T> : InteractionModuleBase<SocketInteractio
         [Summary("shiny", "Should the Pokemon be shiny?")]
         bool shiny = false,
 
-        [Summary("item", "Held item (optional)")]
-        [Autocomplete(typeof(ItemAutocompleteLGPEHandler))]
-        string? item = null,
+        // Note: Let's Go Pikachu/Eevee does not have held items or special features
+        // [Summary("item", "Held item (optional)")]
+        // [Autocomplete(typeof(ItemAutocompleteLGPEHandler))]
+        // string? item = null,
 
         [Summary("ball", "Poke Ball (optional)")]
         [Autocomplete(typeof(BallAutocompleteHandler))]
@@ -45,7 +46,7 @@ public class CreatePokemonLGPEModule<T> : InteractionModuleBase<SocketInteractio
                 Context,
                 pokemon,
                 shiny,
-                item,
+                null, // No held item
                 ball,
                 level,
                 nature,
