@@ -24,7 +24,7 @@
     <EmbedAllSources>true</EmbedAllSources>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <PublishTrimmed>false</PublishTrimmed>
-    <Authors>Kaphotics, hexbyt3, Secludedly</Authors>
+    <Authors>Kaphotics, hexbyt3, Secludedly, Taku1991</Authors>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   

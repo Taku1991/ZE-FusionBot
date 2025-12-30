@@ -531,7 +531,7 @@ public static class WebApiExtensions
                     if (updateAvailable || true) // Always allow update when triggered remotely
                     {
                         var updateForm = new UpdateForm(false, newVersion ?? "latest", true);
-                        updateForm.PerformUpdate();
+                        await updateForm.PerformUpdateAsync();
                     }
                 }
                 catch (Exception ex)

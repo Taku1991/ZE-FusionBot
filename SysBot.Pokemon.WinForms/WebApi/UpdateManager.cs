@@ -1122,10 +1122,10 @@ public static class UpdateManager
 
                     await Task.Run(() =>
                     {
-                        mainForm?.BeginInvoke((MethodInvoker)(() =>
+                        mainForm?.BeginInvoke((MethodInvoker)(async () =>
                         {
                             var updateForm = new UpdateForm(false, targetVersion, true);
-                            updateForm.PerformUpdate();
+                            await updateForm.PerformUpdateAsync();
                         }));
                     }, cancellationToken);
 
