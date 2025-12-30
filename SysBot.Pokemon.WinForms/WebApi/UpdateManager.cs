@@ -1270,6 +1270,19 @@ public static class UpdateManager
         // Keep state for a short time to allow UI to see completion, then clean up
         if (success)
         {
+            // Automatically restart bots after a successful update (master + slaves already updated)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await RestartManager.StartAllBotsSafeAsync();
+                }
+                catch (Exception ex)
+                {
+                    LogUtil.LogError($"Failed to auto-start bots after update: {ex.Message}", "UpdateManager");
+                }
+            }, CancellationToken.None);
+
             // Delete state file after 10 seconds to allow UI to detect completion
             _ = Task.Run(async () =>
             {

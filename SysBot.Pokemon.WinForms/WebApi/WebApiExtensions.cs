@@ -527,16 +527,28 @@ public static class WebApiExtensions
             {
                 try
                 {
-                    var (updateAvailable, _, newVersion) = await UpdateChecker.CheckForUpdatesAsync(false);
-                    if (updateAvailable || true) // Always allow update when triggered remotely
+                    // Fire-and-forget the UpdateManager without showing any UI dialogs
+                    var state = await UpdateManager.StartOrResumeUpdateAsync(_main, _tcpPort, true);
+
+                    // Release the in-progress flag once the update finishes
+                    _ = Task.Run(async () =>
                     {
-                        var updateForm = new UpdateForm(false, newVersion ?? "latest", true);
-                        await updateForm.PerformUpdateAsync();
-                    }
+                        try
+                        {
+                            while (state is { IsComplete: false })
+                                await Task.Delay(1000);
+                        }
+                        catch { }
+                        finally
+                        {
+                            lock (_updateLock) { _updateInProgress = false; }
+                        }
+                    });
                 }
                 catch (Exception ex)
                 {
                     LogUtil.LogError("WebApiExtensions", $"Error during update: {ex.Message}");
+                    lock (_updateLock) { _updateInProgress = false; }
                 }
             }));
 

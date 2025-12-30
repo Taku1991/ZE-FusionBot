@@ -91,6 +91,9 @@ public class PokemonAutocompleteSWSHHandler : AutocompleteHandler
         if (string.IsNullOrWhiteSpace(formName))
             return baseName;
 
+        if (formName.Equals("Normal", StringComparison.OrdinalIgnoreCase))
+            return baseName;
+
         if (species == (ushort)Species.Basculin && formName.Contains("Striped", StringComparison.OrdinalIgnoreCase))
         {
             var color = formName.Replace("-Striped", string.Empty, StringComparison.OrdinalIgnoreCase)

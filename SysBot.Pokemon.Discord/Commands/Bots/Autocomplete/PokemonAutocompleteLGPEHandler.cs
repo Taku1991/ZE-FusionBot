@@ -76,7 +76,7 @@ public class PokemonAutocompleteLGPEHandler : AutocompleteHandler
                     continue;
 
                 var formName = formList.Length > form ? formList[form] : string.Empty;
-                var displayName = string.IsNullOrWhiteSpace(formName) ? name : $"{name}-{formName.Replace(' ', '-')}";
+                var displayName = BuildDisplayName(name, formName, species);
                 var showdownName = displayName;
                 var value = $"{name}|{form}|{showdownName}";
                 validSpecies.Add((displayName, value));
@@ -84,5 +84,24 @@ public class PokemonAutocompleteLGPEHandler : AutocompleteHandler
         }
 
         return validSpecies.OrderBy(s => s.Display).ToList();
+    }
+
+    private static string BuildDisplayName(string baseName, string formName, ushort species)
+    {
+        if (string.IsNullOrWhiteSpace(formName))
+            return baseName;
+
+        if (formName.Equals("Normal", StringComparison.OrdinalIgnoreCase))
+            return baseName;
+
+        if (species == (ushort)Species.Basculin && formName.Contains("Striped", StringComparison.OrdinalIgnoreCase))
+        {
+            var color = formName.Replace("-Striped", string.Empty, StringComparison.OrdinalIgnoreCase)
+                                 .Replace("Striped", string.Empty, StringComparison.OrdinalIgnoreCase)
+                                 .Replace(" ", string.Empty);
+            return $"{baseName}-{color}";
+        }
+
+        return $"{baseName}-{formName.Replace(' ', '-')}";
     }
 }
