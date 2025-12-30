@@ -69,15 +69,28 @@ namespace SysBot.Pokemon.WinForms
                 {
                     string errorContent = await response.Content.ReadAsStringAsync();
                     Console.WriteLine($"GitHub API Error: {response.StatusCode} - {errorContent}");
+
+                    // Log rate limit headers if available
+                    if (response.Headers.TryGetValues("X-RateLimit-Remaining", out var remaining))
+                        Console.WriteLine($"Rate Limit Remaining: {string.Join(", ", remaining)}");
+                    if (response.Headers.TryGetValues("X-RateLimit-Reset", out var reset))
+                        Console.WriteLine($"Rate Limit Reset: {string.Join(", ", reset)}");
+
                     return null;
                 }
 
                 string jsonContent = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<ReleaseInfo>(jsonContent);
+                var releaseInfo = JsonConvert.DeserializeObject<ReleaseInfo>(jsonContent);
+
+                // Log success for debugging
+                Console.WriteLine($"Successfully fetched release info: {releaseInfo?.TagName ?? "null"}");
+
+                return releaseInfo;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching release info: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 return null;
             }
         }
