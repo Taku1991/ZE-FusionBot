@@ -33,22 +33,36 @@ public static class CreatePokemonHelper
     {
         var Info = SysCord<T>.Runner.Hub.Queues.Info;
 
-        // Validate pokemon parameter
-        if (string.IsNullOrWhiteSpace(pokemon))
+        // Pokemon parameter can encode form data as Species|FormIndex|ShowdownName
+        var speciesInput = pokemon;
+        byte form = 0;
+        string showdownSpeciesName = pokemon;
+
+        if (!string.IsNullOrWhiteSpace(pokemon) && pokemon.Contains('|'))
         {
-            await context.Interaction.FollowupAsync($"❌ Pokemon parameter is empty! Please use autocomplete to select a valid Pokemon.", ephemeral: true).ConfigureAwait(false);
+            var parts = pokemon.Split('|');
+            speciesInput = parts.ElementAtOrDefault(0) ?? pokemon;
+            if (byte.TryParse(parts.ElementAtOrDefault(1), out var parsedForm))
+                form = parsedForm;
+            showdownSpeciesName = parts.ElementAtOrDefault(2) ?? speciesInput;
+        }
+
+        // Validate pokemon parameter
+        if (string.IsNullOrWhiteSpace(speciesInput))
+        {
+            await context.Interaction.FollowupAsync($"ƒ?O Pokemon parameter is empty! Please use autocomplete to select a valid Pokemon.", ephemeral: true).ConfigureAwait(false);
             return false;
         }
 
         // Parse Pokemon species
-        if (!Enum.TryParse<Species>(pokemon, true, out var species) || species <= 0)
+        if (!Enum.TryParse<Species>(speciesInput, true, out var species) || species <= 0)
         {
-            await context.Interaction.FollowupAsync($"❌ Invalid Pokemon: **{pokemon}**. Please use autocomplete to select a valid Pokemon.", ephemeral: true).ConfigureAwait(false);
+            await context.Interaction.FollowupAsync($"ƒ?O Invalid Pokemon: **{speciesInput}**. Please use autocomplete to select a valid Pokemon.", ephemeral: true).ConfigureAwait(false);
             return false;
         }
 
         // Build Showdown format string
-        var speciesName = species.ToString();
+        var speciesName = showdownSpeciesName;
         var showdownBuilder = new StringBuilder();
 
         // Line 1: Pokemon @ Item
@@ -116,7 +130,7 @@ public static class CreatePokemonHelper
         if (!string.IsNullOrEmpty(processed.Error) || processed.Pokemon == null)
         {
             var errorMsg = processed.Error ?? "Unknown error occurred during Pokemon generation.";
-            await context.Interaction.FollowupAsync($"❌ {errorMsg}", ephemeral: true).ConfigureAwait(false);
+            await context.Interaction.FollowupAsync($"ƒ?O {errorMsg}", ephemeral: true).ConfigureAwait(false);
             return false;
         }
 
@@ -154,6 +168,14 @@ public static class CreatePokemonHelper
         pk.ResetPartyStats();
         pk.RefreshChecksum();
 
+        // Apply requested form if one was specified
+        if (form > 0 && pk.Form != form)
+        {
+            pk.Form = form;
+            pk.ResetPartyStats();
+            pk.RefreshChecksum();
+        }
+
         // Apply post-processing (for Gigantamax, TeraType, etc.)
         postProcessing?.Invoke(pk);
 
@@ -180,13 +202,13 @@ public static class CreatePokemonHelper
 
         if (added == QueueResultAdd.AlreadyInQueue)
         {
-            await context.Interaction.FollowupAsync("❌ You are already in the queue!", ephemeral: true).ConfigureAwait(false);
+            await context.Interaction.FollowupAsync("ƒ?O You are already in the queue!", ephemeral: true).ConfigureAwait(false);
             return false;
         }
 
         if (added == QueueResultAdd.QueueFull)
         {
-            await context.Interaction.FollowupAsync("❌ The queue is currently full. Please try again later.", ephemeral: true).ConfigureAwait(false);
+            await context.Interaction.FollowupAsync("ƒ?O The queue is currently full. Please try again later.", ephemeral: true).ConfigureAwait(false);
             return false;
         }
 
@@ -236,7 +258,7 @@ public static class CreatePokemonHelper
         if (embedData.IsLocalFile)
         {
             // First, dismiss the "thinking..." message with an empty followup
-            await context.Interaction.FollowupAsync("✅ Pokemon added to queue! Check your DMs for the trade code.", ephemeral: true).ConfigureAwait(false);
+            await context.Interaction.FollowupAsync("ƒo. Pokemon added to queue! Check your DMs for the trade code.", ephemeral: true).ConfigureAwait(false);
             // Then send the embed with the file in the channel
             await context.Channel.SendFileAsync(embedData.EmbedImageUrl, embed: embed).ConfigureAwait(false);
             await QueueHelper<T>.ScheduleFileDeletion(embedData.EmbedImageUrl, 0).ConfigureAwait(false);

@@ -30,11 +30,11 @@ public class PokemonAutocompleteLGPEHandler : AutocompleteHandler
             var filteredSpecies = string.IsNullOrWhiteSpace(userInput)
                 ? validSpecies.Take(25)
                 : validSpecies
-                    .Where(s => s.Contains(userInput, StringComparison.OrdinalIgnoreCase))
+                    .Where(s => s.Display.Contains(userInput, StringComparison.OrdinalIgnoreCase))
                     .Take(25);
 
             var results = filteredSpecies
-                .Select(s => new AutocompleteResult(s, s))
+                .Select(s => new AutocompleteResult(s.Display, s.Value))
                 .ToList();
 
             return Task.FromResult(
@@ -54,25 +54,35 @@ public class PokemonAutocompleteLGPEHandler : AutocompleteHandler
         }
     }
 
-    private static List<string> GetValidSpeciesForLGPE()
+    private static List<(string Display, string Value)> GetValidSpeciesForLGPE()
     {
         var table = PersonalTable.GG;
-        var validSpecies = new List<string>();
+        var strings = GameInfo.GetStrings("en");
+        var validSpecies = new List<(string Display, string Value)>();
 
         for (ushort species = 1; species < (ushort)Species.MAX_COUNT; species++)
         {
-            if (table.IsPresentInGame(species, 0))
+            var name = ((Species)species).ToString();
+            if (name.Equals("None", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("Egg", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var formCount = table[species].FormCount;
+            var formList = FormConverter.GetFormList(species, strings.Types, strings.forms, GameInfo.GenderSymbolASCII, EntityContext.Gen7b);
+
+            for (byte form = 0; form < formCount; form++)
             {
-                var name = ((Species)species).ToString();
-                if (!name.Contains('_') &&
-                    !name.Equals("None", StringComparison.OrdinalIgnoreCase) &&
-                    !name.Equals("Egg", StringComparison.OrdinalIgnoreCase))
-                {
-                    validSpecies.Add(name);
-                }
+                if (!table.IsPresentInGame(species, form))
+                    continue;
+
+                var formName = formList.Length > form ? formList[form] : string.Empty;
+                var displayName = string.IsNullOrWhiteSpace(formName) ? name : $"{name}-{formName.Replace(' ', '-')}";
+                var showdownName = displayName;
+                var value = $"{name}|{form}|{showdownName}";
+                validSpecies.Add((displayName, value));
             }
         }
 
-        return validSpecies.OrderBy(s => s).ToList();
+        return validSpecies.OrderBy(s => s.Display).ToList();
     }
 }
