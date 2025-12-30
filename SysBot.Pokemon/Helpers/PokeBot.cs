@@ -8,7 +8,7 @@ public static class PokeBot
 
     public const string ConfigPath = "config.json";
 
-    public const string Version = "v7.0.8a";
+    public const string Version = "v7.0.8b";
 
     /// <summary>
     /// Checks if a user can use AutoOT functionality.
@@ -19,6 +19,11 @@ public static class PokeBot
     /// <returns>True if the user can use AutoOT, false otherwise</returns>
     public static bool CanUseAutoOT<T>(PokeTradeDetail<T> poke) where T : PKM, new()
     {
+        // IMPORTANT: Disable AutoOT for distribute trades (PokeTradeType.Random)
+        // These trades have no Discord role checking, so we cannot verify AutoOT permission
+        if (poke.Type == PokeTradeType.Random)
+            return false;
+
         // If IgnoreAutoOT is set, it means either:
         // 1. User explicitly specified OT/TID/SID in their request
         // 2. User doesn't have AutoOT role permission (set by Discord module)
