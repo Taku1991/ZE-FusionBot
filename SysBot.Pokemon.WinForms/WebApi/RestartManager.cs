@@ -907,18 +907,7 @@ public static class RestartManager
             }
         }
     }
-
-    public static async Task StartAllBotsSafeAsync()
-    {
-        if (_mainForm == null)
-        {
-            LogUtil.LogError("RestartManager", "Cannot start bots: main form not initialized");
-            return;
-        }
-
-        await StartAllBotsAsync();
-    }
-
+    
     private static async Task StartAllBotsAsync()
     {
         // Start local bots

@@ -368,7 +368,6 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
             using var reader = new StreamReader(request.InputStream);
             var body = await reader.ReadToEndAsync();
             bool forceUpdate = false;
-            bool startRequested = false;
 
             // Check if this is a status check for an existing update
             if (!string.IsNullOrEmpty(body))
@@ -379,48 +378,14 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                     
                     // Check for force flag
                     if (requestData?.ContainsKey("force") == true)
+                    {
                         forceUpdate = requestData["force"].GetBoolean();
-
-                    // Require explicit start flag to avoid accidental auto-updates from polling
-                    if (requestData?.ContainsKey("start") == true)
-                        startRequested = requestData["start"].GetBoolean();
+                    }
                 }
                 catch
                 {
                     // Not JSON, ignore
                 }
-            }
-            else
-            {
-                // Also allow query string trigger (?start=true or ?force=true)
-                var query = System.Web.HttpUtility.ParseQueryString(request.Url?.Query ?? string.Empty);
-                if (bool.TryParse(query.Get("force"), out var force))
-                    forceUpdate = force;
-                if (bool.TryParse(query.Get("start"), out var start))
-                    startRequested = start;
-            }
-
-            // If no explicit start/force flag provided, treat as a status check and don't launch an update
-            if (!forceUpdate && !startRequested)
-            {
-                var existingState = UpdateManager.GetCurrentState();
-                if (existingState != null)
-                {
-                    return JsonSerializer.Serialize(new
-                    {
-                        active = !existingState.IsComplete,
-                        sessionId = existingState.SessionId,
-                        phase = existingState.Phase.ToString(),
-                        message = existingState.Message,
-                        isComplete = existingState.IsComplete,
-                        success = existingState.Success,
-                        totalInstances = existingState.TotalInstances,
-                        completedInstances = existingState.CompletedInstances,
-                        failedInstances = existingState.FailedInstances
-                    }, JsonOptions);
-                }
-
-                return CreateErrorResponse("Update not started. Send { \"start\": true } (or force=true) to launch an update.");
             }
 
             // Check if update is already in progress
@@ -863,7 +828,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
     {
         try
         {
-            var (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(forceShow: false, showDialog: false);
+            var (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(false);
             var changelog = await UpdateChecker.FetchChangelogAsync();
             
             var response = new UpdateCheckResponse
@@ -924,11 +889,9 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
     private async Task<string> GetInstancesAsync()
     {
         var remoteInstances = await ScanRemoteInstancesAsync();
-        var localInstance = CreateLocalInstance();
-
         var response = new InstancesResponse
         {
-            Instances = [localInstance, .. remoteInstances]
+            Instances = [CreateLocalInstance(), .. remoteInstances]
         };
         return JsonSerializer.Serialize(response, JsonOptions);
     }
@@ -976,14 +939,15 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
         const int startPort = 8081;
         const int endPort = 8090; // Reduced from 8181 to 8090 for faster scanning
         const int maxConcurrentScans = 5; // Throttle concurrent connections
+        
         var semaphore = new SemaphoreSlim(maxConcurrentScans, maxConcurrentScans);
         var tasks = new List<Task>();
-
+        
         for (int port = startPort; port <= endPort; port++)
         {
             if (port == _tcpPort)
                 continue;
-
+                
             int capturedPort = port; // Capture for closure
             tasks.Add(Task.Run(async () =>
             {
@@ -994,29 +958,29 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                     using var client = new TcpClient();
                     client.ReceiveTimeout = 500; // Increased from 200ms to 500ms
                     client.SendTimeout = 500;
-
+                    
                     var connectTask = client.ConnectAsync("127.0.0.1", capturedPort);
                     var timeoutTask = Task.Delay(500);
                     var completedTask = await Task.WhenAny(connectTask, timeoutTask);
                     if (completedTask == timeoutTask || !client.Connected)
                         return;
-
+                    
                     using var stream = client.GetStream();
                     using var writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
                     using var reader = new StreamReader(stream, Encoding.UTF8);
 
                     await writer.WriteLineAsync("INFO");
                     await writer.FlushAsync();
-
+                    
                     // Read response with timeout
                     stream.ReadTimeout = 1000; // Increased from 500ms to 1000ms
                     var response = await reader.ReadLineAsync();
-
+                    
                     if (!string.IsNullOrEmpty(response) && response.StartsWith('{'))
                     {
                         // This is a ZE_FusionBot instance - find the process ID
                         int processId = FindProcessIdForPort(capturedPort);
-
+                        
                         var instance = new BotInstance
                         {
                             ProcessId = processId,
@@ -1033,7 +997,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
 
                         // Update instance info from the response
                         UpdateInstanceInfo(instance, capturedPort);
-
+                        
                         lock (instances) // Thread-safe addition
                         {
                             instances.Add(instance);
@@ -1041,10 +1005,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                         discoveredPorts.Add(capturedPort);
                     }
                 }
-                catch (Exception)
-                {
-                    // Port scan failed, ignore
-                }
+                catch { /* Port not open or not a ZE_FusionBot instance */ }
                 finally
                 {
                     semaphore.Release();
@@ -1183,7 +1144,6 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
         try
         {
             var infoResponse = QueryRemote(port, "INFO");
-
             if (infoResponse.StartsWith('{'))
             {
                 using var doc = JsonDocument.Parse(infoResponse);
@@ -1197,13 +1157,12 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
 
                 if (root.TryGetProperty("Name", out var name))
                     instance.Name = name.GetString() ?? "ZE_FusionBot";
-
+                    
                 if (root.TryGetProperty("ProcessPath", out var processPath))
                     instance.ProcessPath = processPath.GetString();
             }
 
             var botsResponse = QueryRemote(port, "LISTBOTS");
-
             if (botsResponse.StartsWith('{') && botsResponse.Contains("Bots"))
             {
                 var botsData = JsonSerializer.Deserialize<Dictionary<string, List<BotInfo>>>(botsResponse);
@@ -1218,10 +1177,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                 }
             }
         }
-        catch (Exception ex)
-        {
-            LogUtil.LogError($"UpdateInstanceInfo failed for port {port}: {ex.Message}", "WebServer");
-        }
+        catch { }
     }
 
     private static bool IsPortOpen(int port)
@@ -1271,7 +1227,9 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                     })]
                 };
 
-                return JsonSerializer.Serialize(response, JsonOptions);
+                var json = JsonSerializer.Serialize(response, JsonOptions);
+                LogUtil.LogInfo($"GetBots returning {json.Length} bytes for port {port}", "WebAPI");
+                return json;
             }
         }
         catch (Exception ex)
@@ -1553,17 +1511,13 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
             // 1) Try direct field named FLP_Bots (legacy)
             var flpField = type.GetField("FLP_Bots", flags);
             if (flpField?.GetValue(_mainForm) is FlowLayoutPanel flp1)
-            {
                 results.AddRange(flp1.Controls.OfType<BotController>());
-            }
 
             // 2) Scan all fields/properties on Main for FlowLayoutPanel
             foreach (var f in type.GetFields(flags))
             {
                 if (typeof(FlowLayoutPanel).IsAssignableFrom(f.FieldType) && f.GetValue(_mainForm) is FlowLayoutPanel flp)
-                {
                     results.AddRange(flp.Controls.OfType<BotController>());
-                }
             }
 
             foreach (var p in type.GetProperties(flags))
@@ -1573,9 +1527,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                     try
                     {
                         if (p.GetValue(_mainForm) is FlowLayoutPanel flpProp)
-                        {
                             results.AddRange(flpProp.Controls.OfType<BotController>());
-                        }
                     }
                     catch { /* ignore property getters with side effects */ }
                 }
@@ -1592,9 +1544,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                 {
                     var botPanelProp = botsFormObj.GetType().GetProperty("BotPanel", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                     if (botPanelProp?.GetValue(botsFormObj) is FlowLayoutPanel botPanel)
-                    {
                         results.AddRange(botPanel.Controls.OfType<BotController>());
-                    }
                 }
             }
 
@@ -1711,8 +1661,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
     private bool IsMasterInstance()
     {
         // Master is the instance hosting the web server on the configured control panel port
-        var config = GetConfig();
-        var configuredPort = config?.Hub?.WebServer?.ControlPanelPort ?? 8080;
+        var configuredPort = Main.Config?.Hub?.WebServer?.ControlPanelPort ?? 8080;
         return _port == configuredPort;
     }
     

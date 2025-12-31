@@ -488,7 +488,7 @@ public static class WebApiExtensions
             "STATUS" => GetBotStatuses(botId),
             "ISREADY" => CheckReady(),
             "INFO" => GetInstanceInfo(),
-            "VERSION" => PokeBot.Version,
+            "VERSION" => SysBot.Pokemon.PokeBot.Version,
             "UPDATE" => TriggerUpdate(),
             "SELFRESTARTALL" => TriggerSelfRestart(),
             "RESTARTSCHEDULE" => GetRestartSchedule(),
@@ -527,28 +527,16 @@ public static class WebApiExtensions
             {
                 try
                 {
-                    // Fire-and-forget the UpdateManager without showing any UI dialogs
-                    var state = await UpdateManager.StartOrResumeUpdateAsync(_main, _tcpPort, true);
-
-                    // Release the in-progress flag once the update finishes
-                    _ = Task.Run(async () =>
+                    var (updateAvailable, _, newVersion) = await UpdateChecker.CheckForUpdatesAsync(false);
+                    if (updateAvailable || true) // Always allow update when triggered remotely
                     {
-                        try
-                        {
-                            while (state is { IsComplete: false })
-                                await Task.Delay(1000);
-                        }
-                        catch { }
-                        finally
-                        {
-                            lock (_updateLock) { _updateInProgress = false; }
-                        }
-                    });
+                        var updateForm = new UpdateForm(false, newVersion ?? "latest", true);
+                        updateForm.PerformUpdate();
+                    }
                 }
                 catch (Exception ex)
                 {
                     LogUtil.LogError("WebApiExtensions", $"Error during update: {ex.Message}");
-                    lock (_updateLock) { _updateInProgress = false; }
                 }
             }));
 
@@ -645,14 +633,12 @@ public static class WebApiExtensions
 
                 if (botsProperty?.GetValue(_main) is List<PokeBotState> bots)
                 {
-                    var mode = config?.Mode.ToString() ?? "Unknown";
                     foreach (var bot in bots)
                     {
                         botList.Add(new
                         {
                             Id = $"{bot.Connection.IP}:{bot.Connection.Port}",
                             Name = bot.Connection.IP,
-                            Mode = mode,
                             RoutineType = bot.InitialRoutine.ToString(),
                             Status = "Unknown",
                             ConnectionType = bot.Connection.Protocol.ToString(),
@@ -670,13 +656,11 @@ public static class WebApiExtensions
                 var state = controller.State;
                 var botName = GetBotName(state, config);
                 var status = controller.ReadBotState();
-                var mode = config?.Mode.ToString() ?? "Unknown";
 
                 botList.Add(new
                 {
                     Id = $"{state.Connection.IP}:{state.Connection.Port}",
                     Name = botName,
-                    Mode = mode,
                     RoutineType = state.InitialRoutine.ToString(),
                     Status = status,
                     ConnectionType = state.Connection.Protocol.ToString(),
@@ -871,22 +855,9 @@ public static class WebApiExtensions
 
     private static List<BotController> GetBotControllers()
     {
-        var type = _main!.GetType();
-        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public;
+        var flpBotsField = _main!.GetType().GetField("FLP_Bots",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-        // Try the common pattern: _botsForm that contains BotPanel
-        var botsFormField = type.GetField("_botsForm", flags);
-        if (botsFormField?.GetValue(_main) is object botsFormObj)
-        {
-            var botPanelProp = botsFormObj.GetType().GetProperty("BotPanel", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-            if (botPanelProp?.GetValue(botsFormObj) is FlowLayoutPanel botPanel)
-            {
-                return [.. botPanel.Controls.OfType<BotController>()];
-            }
-        }
-
-        // Fallback: Try direct field named FLP_Bots
-        var flpBotsField = type.GetField("FLP_Bots", flags);
         if (flpBotsField?.GetValue(_main) is FlowLayoutPanel flpBots)
         {
             return [.. flpBots.Controls.OfType<BotController>()];
@@ -897,10 +868,9 @@ public static class WebApiExtensions
 
     private static ProgramConfig? GetConfig()
     {
-        // Config is a static property in Main class
         var configProp = _main?.GetType().GetProperty("Config",
-            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-        return configProp?.GetValue(null) as ProgramConfig;
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        return configProp?.GetValue(_main) as ProgramConfig;
     }
 
     private static string GetBotName(PokeBotState state, ProgramConfig? config)
@@ -910,7 +880,7 @@ public static class WebApiExtensions
 
     private static string GetVersion()
     {
-        return PokeBot.Version;
+        return SysBot.Pokemon.PokeBot.Version;
     }
 
     private static string GetInstanceName(ProgramConfig? config, string mode)
