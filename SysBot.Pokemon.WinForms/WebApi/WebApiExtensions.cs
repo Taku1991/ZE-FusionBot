@@ -868,9 +868,20 @@ public static class WebApiExtensions
 
     private static ProgramConfig? GetConfig()
     {
-        var configProp = _main?.GetType().GetProperty("Config",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        return configProp?.GetValue(_main) as ProgramConfig;
+        var type = _main?.GetType();
+        if (type == null)
+            return null;
+
+        // Prefer the public static Config property defined on Main
+        var staticProp = type.GetProperty("Config",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.FlattenHierarchy);
+        if (staticProp != null)
+            return staticProp.GetValue(null) as ProgramConfig;
+
+        // Fallback to any instance property if it exists
+        var instProp = type.GetProperty("Config",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        return instProp?.GetValue(_main) as ProgramConfig;
     }
 
     private static string GetBotName(PokeBotState state, ProgramConfig? config)
