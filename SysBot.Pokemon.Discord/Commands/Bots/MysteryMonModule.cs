@@ -236,7 +236,7 @@ namespace SysBot.Pokemon.Discord
         private static void SetLevel(T pk)
         {
             int level;
-            level = rng.Next(61, 101);
+            level = rng.Next(21, 101);
 
             pk.CurrentLevel = (byte)level;
         }

@@ -1273,6 +1273,10 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
             {
                 // Normalize content
                 content = BatchCommandNormalizer.NormalizeBatchCommands(content);
+
+                // Parse hypertraining preferences before stripping code blocks
+                var userHTPreferences = AutoLegalityExtensionsDiscord.ParseHyperTrainingCommandsPublic(content);
+
                 content = ReusableActions.StripCodeBlock(content);
 
                 // Get user roles for permission checking and strip trainer data BEFORE parsing
@@ -1394,7 +1398,8 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                         set.Nature,
                         set.Shiny,
                         sav,
-                        template
+                        template,
+                        userHTPreferences
                     );
                 }
 
