@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using SysBot.Base;
 using System.Diagnostics;
 using SysBot.Pokemon.Helpers;
+using System.Reflection;
 using SysBot.Pokemon.WinForms.WebApi;
 using static SysBot.Pokemon.WinForms.WebApi.RestartManager;
 using System.Collections.Concurrent;
@@ -855,15 +856,51 @@ public static class WebApiExtensions
 
     private static List<BotController> GetBotControllers()
     {
-        var flpBotsField = _main!.GetType().GetField("FLP_Bots",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (_main == null)
+            return [];
 
-        if (flpBotsField?.GetValue(_main) is FlowLayoutPanel flpBots)
+        var results = new List<BotController>();
+        var type = _main.GetType();
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+
+        // 1) Try direct field named FLP_Bots (common case)
+        var flpField = type.GetField("FLP_Bots", flags);
+        if (flpField?.GetValue(_main) is FlowLayoutPanel flpBots)
+            results.AddRange(flpBots.Controls.OfType<BotController>());
+
+        // 2) Scan all fields/properties for FlowLayoutPanel and collect BotController children
+        foreach (var f in type.GetFields(flags))
         {
-            return [.. flpBots.Controls.OfType<BotController>()];
+            if (typeof(FlowLayoutPanel).IsAssignableFrom(f.FieldType) && f.GetValue(_main) is FlowLayoutPanel flp)
+                results.AddRange(flp.Controls.OfType<BotController>());
         }
 
-        return [];
+        foreach (var p in type.GetProperties(flags))
+        {
+            if (typeof(FlowLayoutPanel).IsAssignableFrom(p.PropertyType))
+            {
+                try
+                {
+                    if (p.GetValue(_main) is FlowLayoutPanel flpProp)
+                        results.AddRange(flpProp.Controls.OfType<BotController>());
+                }
+                catch { /* ignore property getters with side effects */ }
+            }
+        }
+
+        // 3) Inspect BotsForm if present and grab its BotPanel (used in multi-form layouts)
+        var botsField = type.GetField("_botsForm", flags);
+        var botsProp = type.GetProperty("_botsForm", flags);
+        var botsFormObj = botsField?.GetValue(_main) ?? botsProp?.GetValue(_main);
+        if (botsFormObj != null)
+        {
+            var botPanelProp = botsFormObj.GetType().GetProperty("BotPanel",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (botPanelProp?.GetValue(botsFormObj) is FlowLayoutPanel botPanel)
+                results.AddRange(botPanel.Controls.OfType<BotController>());
+        }
+
+        return results.Distinct().ToList();
     }
 
     private static ProgramConfig? GetConfig()
