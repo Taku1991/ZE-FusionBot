@@ -368,6 +368,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
             using var reader = new StreamReader(request.InputStream);
             var body = await reader.ReadToEndAsync();
             bool forceUpdate = false;
+            bool startRequested = false;
 
             // Check if this is a status check for an existing update
             if (!string.IsNullOrEmpty(body))
@@ -378,14 +379,48 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                     
                     // Check for force flag
                     if (requestData?.ContainsKey("force") == true)
-                    {
                         forceUpdate = requestData["force"].GetBoolean();
-                    }
+
+                    // Require explicit start flag to avoid accidental auto-updates from polling
+                    if (requestData?.ContainsKey("start") == true)
+                        startRequested = requestData["start"].GetBoolean();
                 }
                 catch
                 {
                     // Not JSON, ignore
                 }
+            }
+            else
+            {
+                // Also allow query string trigger (?start=true or ?force=true)
+                var query = System.Web.HttpUtility.ParseQueryString(request.Url?.Query ?? string.Empty);
+                if (bool.TryParse(query.Get("force"), out var force))
+                    forceUpdate = force;
+                if (bool.TryParse(query.Get("start"), out var start))
+                    startRequested = start;
+            }
+
+            // If no explicit start/force flag provided, treat as a status check and don't launch an update
+            if (!forceUpdate && !startRequested)
+            {
+                var existingState = UpdateManager.GetCurrentState();
+                if (existingState != null)
+                {
+                    return JsonSerializer.Serialize(new
+                    {
+                        active = !existingState.IsComplete,
+                        sessionId = existingState.SessionId,
+                        phase = existingState.Phase.ToString(),
+                        message = existingState.Message,
+                        isComplete = existingState.IsComplete,
+                        success = existingState.Success,
+                        totalInstances = existingState.TotalInstances,
+                        completedInstances = existingState.CompletedInstances,
+                        failedInstances = existingState.FailedInstances
+                    }, JsonOptions);
+                }
+
+                return CreateErrorResponse("Update not started. Send { \"start\": true } (or force=true) to launch an update.");
             }
 
             // Check if update is already in progress
