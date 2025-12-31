@@ -80,6 +80,8 @@ public class PokemonAutocompletePLZAHandler : AutocompleteHandler
                     continue;
 
                 var formName = formList.Length > form ? formList[form] : string.Empty;
+                if (form > 0 && string.IsNullOrWhiteSpace(formName))
+                    continue; // skip unnamed extra forms to avoid duplicates
                 if (ForbiddenForms.IsForbidden(species, form, formName))
                     continue;
 
