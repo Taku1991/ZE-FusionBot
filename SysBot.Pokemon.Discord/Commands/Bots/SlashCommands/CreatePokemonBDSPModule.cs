@@ -34,6 +34,7 @@ public class CreatePokemonBDSPModule<T> : InteractionModuleBase<SocketInteractio
         int level = 100,
 
         [Summary("nature", "Pokemon nature (optional)")]
+        [Autocomplete(typeof(NatureAutocompleteHandler))]
         string? nature = null
     )
     {

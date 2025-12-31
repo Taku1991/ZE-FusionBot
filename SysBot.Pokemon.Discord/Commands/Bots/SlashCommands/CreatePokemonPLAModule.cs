@@ -38,6 +38,7 @@ public class CreatePokemonPLAModule<T> : InteractionModuleBase<SocketInteraction
         int level = 100,
 
         [Summary("nature", "Pokemon nature (optional)")]
+        [Autocomplete(typeof(NatureAutocompleteHandler))]
         string? nature = null
     )
     {

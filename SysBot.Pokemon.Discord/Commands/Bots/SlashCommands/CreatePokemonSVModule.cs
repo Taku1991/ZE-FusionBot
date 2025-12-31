@@ -56,6 +56,7 @@ public class CreatePokemonSVModule<T> : InteractionModuleBase<SocketInteractionC
         int level = 100,
 
         [Summary("nature", "Pokemon nature (optional)")]
+        [Autocomplete(typeof(NatureAutocompleteHandler))]
         string? nature = null
     )
     {
