@@ -828,7 +828,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
     {
         try
         {
-            var (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(false);
+            var (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(forceShow: false, showDialog: false);
             var changelog = await UpdateChecker.FetchChangelogAsync();
             
             var response = new UpdateCheckResponse

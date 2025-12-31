@@ -30,7 +30,7 @@ namespace SysBot.Pokemon.WinForms
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "ZE-FusionBot");
         }
 
-        public static async Task<(bool UpdateAvailable, bool UpdateRequired, string NewVersion)> CheckForUpdatesAsync(bool forceShow = false)
+        public static async Task<(bool UpdateAvailable, bool UpdateRequired, string NewVersion)> CheckForUpdatesAsync(bool forceShow = false, bool showDialog = true)
         {
             ReleaseInfo? latestRelease = await FetchLatestReleaseAsync();
 
@@ -38,7 +38,7 @@ namespace SysBot.Pokemon.WinForms
             bool updateRequired = latestRelease?.Prerelease == false && IsUpdateRequired(latestRelease?.Body);
             string? newVersion = latestRelease?.TagName;
 
-            if (updateAvailable || forceShow)
+            if (showDialog && (updateAvailable || forceShow))
             {
                 var updateForm = new UpdateForm(updateRequired, newVersion ?? "", updateAvailable);
                 updateForm.ShowDialog();

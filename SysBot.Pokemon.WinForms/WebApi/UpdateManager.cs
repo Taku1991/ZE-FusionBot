@@ -319,7 +319,7 @@ public static class UpdateManager
             cts.CancelAfter(TimeSpan.FromMinutes(Config.NewProcessStartTimeoutMinutes));
 
             // Check for updates first with timeout
-            var (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(false);
+            var (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(forceShow: false, showDialog: false);
             if (!updateAvailable)
             {
                 LogUtil.LogInfo("No updates available", "UpdateManager");
@@ -394,7 +394,7 @@ public static class UpdateManager
                 versionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 versionCts.CancelAfter(Config.VersionCheckTimeoutMs);
                 
-                (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(false).WaitAsync(versionCts.Token);
+                (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(forceShow: false, showDialog: false).WaitAsync(versionCts.Token);
             }
             finally
             {
