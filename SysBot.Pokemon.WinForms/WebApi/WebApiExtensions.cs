@@ -531,8 +531,9 @@ public static class WebApiExtensions
                     var (updateAvailable, _, newVersion) = await UpdateChecker.CheckForUpdatesAsync(false);
                     if (updateAvailable || true) // Always allow update when triggered remotely
                     {
-                        var updateForm = new UpdateForm(false, newVersion ?? "latest", true);
-                        updateForm.PerformUpdate();
+                        // Directly restart without showing UpdateForm (automated update from WebUI)
+                        LogUtil.LogInfo("WebApiExtensions", "Starting application restart for update");
+                        Application.Restart();
                     }
                 }
                 catch (Exception ex)

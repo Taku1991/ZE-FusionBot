@@ -888,8 +888,9 @@ public static class UpdateManager
             if (instance.ProcessId == Environment.ProcessId)
             {
                 // Check local bots
-                if (mainForm == null) 
+                if (mainForm == null)
                 {
+                    LogUtil.LogInfo($"mainForm is null for local instance - assuming no bots (this might indicate a problem)", "UpdateManager");
                     idleStatus.TotalBots = 0;
                     idleStatus.IdleBots = 0;
                     return;
@@ -1043,7 +1044,8 @@ public static class UpdateManager
                             isIdle = controllers.All(c =>
                             {
                                 var state = c.ReadBotState();
-                                return state == "IDLE" || state == "STOPPED";
+                                var upperState = state?.ToUpperInvariant() ?? "";
+                                return upperState == "IDLE" || upperState == "STOPPED";
                             });
                         }
                     }));
@@ -1106,7 +1108,7 @@ public static class UpdateManager
                     // Master update - trigger restart
                     var baseDir = Path.GetDirectoryName(Application.ExecutablePath) ?? "";
                     var updateFlagPath = Path.Combine(baseDir, "update_in_progress.flag");
-                    
+
                     var safeFlagPath = ValidateAndSanitizePath(updateFlagPath);
                     if (safeFlagPath != null)
                     {
@@ -1116,16 +1118,17 @@ public static class UpdateManager
                             TargetVersion = SanitizeVersionString(targetVersion),
                             _state?.SessionId
                         });
-                        
+
                         await File.WriteAllTextAsync(safeFlagPath, flagData, cancellationToken);
                     }
 
+                    // Directly restart without showing UpdateForm (automated update from WebUI)
                     await Task.Run(() =>
                     {
                         mainForm?.BeginInvoke((MethodInvoker)(() =>
                         {
-                            var updateForm = new UpdateForm(false, targetVersion, true);
-                            updateForm.PerformUpdate();
+                            LogUtil.LogInfo("Starting application restart for update", "UpdateManager");
+                            Application.Restart();
                         }));
                     }, cancellationToken);
 
