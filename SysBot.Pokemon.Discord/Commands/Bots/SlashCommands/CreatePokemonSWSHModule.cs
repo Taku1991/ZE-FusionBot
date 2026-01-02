@@ -2,6 +2,7 @@ using Discord.Interactions;
 using Discord.WebSocket;
 using PKHeX.Core;
 using SysBot.Pokemon.Discord.Commands.Bots.Autocomplete;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
@@ -11,6 +12,45 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// </summary>
 public class CreatePokemonSWSHModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
+    /// <summary>
+    /// List of Pokemon species that can Gigantamax in Sword/Shield
+    /// </summary>
+    private static readonly HashSet<Species> GigantamaxSpecies = new()
+    {
+        Species.Venusaur,
+        Species.Charizard,
+        Species.Blastoise,
+        Species.Butterfree,
+        Species.Pikachu,
+        Species.Meowth,
+        Species.Machamp,
+        Species.Gengar,
+        Species.Kingler,
+        Species.Lapras,
+        Species.Eevee,
+        Species.Snorlax,
+        Species.Garbodor,
+        Species.Melmetal,
+        Species.Rillaboom,
+        Species.Cinderace,
+        Species.Inteleon,
+        Species.Corviknight,
+        Species.Orbeetle,
+        Species.Drednaw,
+        Species.Coalossal,
+        Species.Flapple,
+        Species.Appletun,
+        Species.Sandaconda,
+        Species.Toxtricity,
+        Species.Centiskorch,
+        Species.Hatterene,
+        Species.Grimmsnarl,
+        Species.Alcremie,
+        Species.Copperajah,
+        Species.Duraludon,
+        Species.Urshifu,
+    };
+
     [SlashCommand("create-swsh", "Create a Sword/Shield Pokemon with Gigantamax support")]
     public async Task CreatePokemonSWSHAsync(
         [Summary("pokemon", "Pokemon species")]
@@ -45,8 +85,30 @@ public class CreatePokemonSWSHModule<T> : InteractionModuleBase<SocketInteractio
 
         try
         {
-            // Build Gigantamax feature string (will be added to Showdown format)
-            string specialFeature = gigantamax ? "Gigantamax: Yes" : string.Empty;
+            // Parse Pokemon species to check if it can Gigantamax
+            var speciesInput = pokemon;
+            if (!string.IsNullOrWhiteSpace(pokemon) && pokemon.Contains('|'))
+            {
+                speciesInput = pokemon.Split('|')[0];
+            }
+
+            bool canGigantamax = false;
+            if (System.Enum.TryParse<Species>(speciesInput, true, out var species))
+            {
+                canGigantamax = GigantamaxSpecies.Contains(species);
+            }
+
+            // Build Gigantamax feature string - only if the species can actually Gigantamax
+            string specialFeature = (gigantamax && canGigantamax) ? "Gigantamax: Yes" : string.Empty;
+
+            // Post-processing: Apply Gigantamax only if the species can actually Gigantamax
+            void PostProcess(T pk)
+            {
+                if (gigantamax && canGigantamax && pk is PK8 pk8)
+                {
+                    pk8.CanGigantamax = true;
+                }
+            }
 
             await CreatePokemonHelper.ExecuteCreatePokemonAsync<T>(
                 Context,
@@ -57,7 +119,7 @@ public class CreatePokemonSWSHModule<T> : InteractionModuleBase<SocketInteractio
                 level,
                 nature,
                 specialFeature,
-                null // No post-processing needed for Gigantamax (handled by Showdown)
+                PostProcess
             ).ConfigureAwait(false);
         }
         catch (System.Exception ex)

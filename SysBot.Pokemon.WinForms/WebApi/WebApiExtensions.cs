@@ -30,6 +30,11 @@ public static class WebApiExtensions
     private static readonly object _portLock = new object();
     private static readonly ConcurrentDictionary<int, DateTime> _portReservations = new();
 
+    /// <summary>
+    /// Get the Main form for this instance (used by UpdateManager)
+    /// </summary>
+    public static Main? GetMainForm() => _main;
+
     public static void InitWebServer(this Main mainForm)
     {
         _main = mainForm;

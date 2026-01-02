@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -887,10 +888,11 @@ public static class UpdateManager
         {
             if (instance.ProcessId == Environment.ProcessId)
             {
-                // Check local bots
-                if (mainForm == null)
+                // Check local bots - use the local Main form from WebApiExtensions
+                var localMainForm = WebApiExtensions.GetMainForm();
+                if (localMainForm == null)
                 {
-                    LogUtil.LogInfo($"mainForm is null for local instance - assuming no bots (this might indicate a problem)", "UpdateManager");
+                    LogUtil.LogInfo($"Local Main form is null for local instance - assuming no bots (this might indicate a problem)", "UpdateManager");
                     idleStatus.TotalBots = 0;
                     idleStatus.IdleBots = 0;
                     return;
@@ -898,12 +900,12 @@ public static class UpdateManager
                 
                 await Task.Run(() =>
                 {
-                    mainForm.Invoke((MethodInvoker)(() =>
+                    localMainForm.Invoke((MethodInvoker)(() =>
                     {
-                        var flpBotsField = mainForm.GetType().GetField("FLP_Bots",
+                        var flpBotsField = localMainForm.GetType().GetField("FLP_Bots",
                             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        
-                        if (flpBotsField?.GetValue(mainForm) is FlowLayoutPanel flpBots)
+
+                        if (flpBotsField?.GetValue(localMainForm) is FlowLayoutPanel flpBots)
                         {
                             var controllers = flpBots.Controls.OfType<BotController>().ToList();
                             idleStatus.TotalBots = controllers.Count;
@@ -1105,10 +1107,29 @@ public static class UpdateManager
 
                 if (instance.IsMaster)
                 {
-                    // Master update - trigger restart
+                    // Master update - download and install update
+                    LogUtil.LogInfo("Downloading update for master instance", "UpdateManager");
+
+                    // Download the update
+                    string? downloadUrl = await UpdateChecker.FetchDownloadUrlAsync();
+                    if (string.IsNullOrWhiteSpace(downloadUrl))
+                    {
+                        throw new Exception("Failed to fetch download URL from GitHub");
+                    }
+
+                    LogUtil.LogInfo($"Downloading update from: {downloadUrl}", "UpdateManager");
+                    string downloadedFilePath = await DownloadUpdateAsync(downloadUrl, cancellationToken);
+
+                    if (string.IsNullOrEmpty(downloadedFilePath))
+                    {
+                        throw new Exception("Failed to download update file");
+                    }
+
+                    LogUtil.LogInfo($"Update downloaded to: {downloadedFilePath}", "UpdateManager");
+
+                    // Create update flag
                     var baseDir = Path.GetDirectoryName(Application.ExecutablePath) ?? "";
                     var updateFlagPath = Path.Combine(baseDir, "update_in_progress.flag");
-
                     var safeFlagPath = ValidateAndSanitizePath(updateFlagPath);
                     if (safeFlagPath != null)
                     {
@@ -1118,21 +1139,20 @@ public static class UpdateManager
                             TargetVersion = SanitizeVersionString(targetVersion),
                             _state?.SessionId
                         });
-
                         await File.WriteAllTextAsync(safeFlagPath, flagData, cancellationToken);
                     }
 
-                    // Directly restart without showing UpdateForm (automated update from WebUI)
+                    // Install update (creates batch script and exits)
                     await Task.Run(() =>
                     {
                         mainForm?.BeginInvoke((MethodInvoker)(() =>
                         {
-                            LogUtil.LogInfo("Starting application restart for update", "UpdateManager");
-                            Application.Restart();
+                            LogUtil.LogInfo("Installing update and restarting application", "UpdateManager");
+                            InstallUpdateAndRestart(downloadedFilePath);
                         }));
                     }, cancellationToken);
 
-                    // Application will restart
+                    // Application will exit and be restarted by batch script
                     return;
                 }
                 else
@@ -1598,5 +1618,83 @@ public static class UpdateManager
         }
         
         return 0; // Not found
+    }
+
+    /// <summary>
+    /// Download update file from URL
+    /// </summary>
+    private static async Task<string> DownloadUpdateAsync(string downloadUrl, CancellationToken cancellationToken)
+    {
+        string tempPath = Path.Combine(Path.GetTempPath(), $"SysBot.Pokemon.WinForms_{Guid.NewGuid()}.exe");
+
+        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        client.DefaultRequestHeaders.Add("User-Agent", "ZE-FusionBot");
+
+        var response = await client.GetAsync(downloadUrl, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var fileBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        await File.WriteAllBytesAsync(tempPath, fileBytes, cancellationToken);
+
+        LogUtil.LogInfo($"Downloaded {fileBytes.Length} bytes to {tempPath}", "UpdateManager");
+        return tempPath;
+    }
+
+    /// <summary>
+    /// Install update and restart application (creates batch script)
+    /// </summary>
+    private static void InstallUpdateAndRestart(string downloadedFilePath)
+    {
+        try
+        {
+            string currentExePath = Application.ExecutablePath;
+            string applicationDirectory = Path.GetDirectoryName(currentExePath) ?? "";
+            string executableName = Path.GetFileName(currentExePath);
+            string backupPath = Path.Combine(applicationDirectory, $"{executableName}.backup");
+
+            // Create batch file for update process
+            string batchPath = Path.Combine(Path.GetTempPath(), "UpdateSysBot.bat");
+            string batchContent = @$"
+@echo off
+timeout /t 2 /nobreak >nul
+echo Updating SysBot...
+rem Backup current version
+if exist ""{currentExePath}"" (
+    if exist ""{backupPath}"" (
+        del ""{backupPath}""
+    )
+    move ""{currentExePath}"" ""{backupPath}""
+)
+rem Install new version
+move ""{downloadedFilePath}"" ""{currentExePath}""
+rem Start new version
+start """" ""{currentExePath}""
+rem Clean up
+del ""%~f0""
+";
+
+            File.WriteAllText(batchPath, batchContent);
+
+            LogUtil.LogInfo("Starting update batch script", "UpdateManager");
+
+            // Start the update batch file
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = batchPath,
+                CreateNoWindow = true,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+            Process.Start(startInfo);
+
+            // Exit the current instance
+            LogUtil.LogInfo("Exiting application for update", "UpdateManager");
+            Application.Exit();
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to install update: {ex.Message}", "UpdateManager");
+            throw;
+        }
     }
 }
