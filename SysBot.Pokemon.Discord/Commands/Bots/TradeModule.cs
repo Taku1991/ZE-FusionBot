@@ -1487,25 +1487,49 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
             hasAutoOTRole = SysCordSettings.Manager.GetHasRoleAccess(nameof(DiscordManager.RolesAutoOT), roles);
         }
 
+        // Check global AllowTrainerDataOverride setting
+        bool allowTrainerOverride = SysCord<T>.Runner.Hub.Config.Legality.AllowTrainerDataOverride;
+
+        // User can set custom trainer data ONLY if BOTH conditions are met:
+        // 1. They have the AutoOT role (hasAutoOTRole)
+        // 2. Global setting allows trainer override (allowTrainerOverride)
+        bool canSetCustomTrainerData = hasAutoOTRole && allowTrainerOverride;
+
         // Check if the uploaded PKM file already has trainer data set
         bool hasTrainerData = !string.IsNullOrWhiteSpace(pk.OriginalTrainerName) &&
                               pk.DisplayTID != 0;
 
-        // If user doesn't have AutoOT role but the file has trainer data, clear it
-        if (!hasAutoOTRole && hasTrainerData)
+        // Check if this is an Event with a FIXED preset OT (not default fallback values)
+        // Events with fixed OT (like "HOME" for Zeraora) should NEVER be changed
+        // Events with variable OT (like Mew) will have default fallback values that can be changed
+        // Check against known default/fallback trainer values (from AutoLegalityWrapper)
+        var defaultTrainer = AutoLegalityWrapper.GetFallbackTrainer();
+        bool hasDefaultTrainerInfo = pk.OriginalTrainerName.Equals(defaultTrainer.OT, StringComparison.OrdinalIgnoreCase) &&
+                                     pk.TID16 == defaultTrainer.TID16 &&
+                                     pk.SID16 == defaultTrainer.SID16;
+
+        bool isEventWithFixedOT = pk.FatefulEncounter && hasTrainerData && !hasDefaultTrainerInfo;
+
+        // If this is an Event with FIXED preset OT (like "HOME" for Zeraora), ALWAYS preserve it
+        if (isEventWithFixedOT)
         {
-            // Clear trainer data - will be overwritten by AutoOT during trade
+            ignoreAutoOT = true; // Preserve fixed Event trainer data regardless of role
+        }
+        // If user CAN set custom trainer data and file has trainer data, keep it (user's own OT)
+        else if (canSetCustomTrainerData && hasTrainerData)
+        {
+            ignoreAutoOT = true; // Preserve the uploaded trainer data
+        }
+        // If user doesn't have permission but the file has trainer data, clear it
+        else if (!canSetCustomTrainerData && hasTrainerData)
+        {
+            // Clear trainer data - will be overwritten by AutoOT during trade (Bot OT)
             pk.OriginalTrainerName = string.Empty;
             pk.TrainerTID7 = 0;
             pk.TrainerSID7 = 0;
             pk.DisplayTID = 0;
             pk.DisplaySID = 0;
             ignoreAutoOT = false; // Ensure AutoOT will be applied
-        }
-        // If user has AutoOT role and file has trainer data, keep it
-        else if (hasAutoOTRole && hasTrainerData)
-        {
-            ignoreAutoOT = true; // Preserve the uploaded trainer data
         }
         // Otherwise, let AutoOT handle it (if enabled)
         else

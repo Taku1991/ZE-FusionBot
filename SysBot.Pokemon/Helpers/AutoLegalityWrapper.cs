@@ -18,6 +18,7 @@ public static class AutoLegalityWrapper
         if (Initialized)
             return;
         Initialized = true;
+        CachedSettings = cfg;
         InitializeAutoLegality(cfg);
     }
 
@@ -102,6 +103,8 @@ public static class AutoLegalityWrapper
         RegisterIfNoneExist(fallback, 7, GameVersion.GE);
     }
 
+    private static LegalitySettings? CachedSettings;
+
     private static SimpleTrainerInfo GetDefaultTrainer(LegalitySettings cfg)
     {
         var OT = cfg.GenerateOT;
@@ -116,6 +119,14 @@ public static class AutoLegalityWrapper
             Generation = 0,
         };
         return fallback;
+    }
+
+    public static SimpleTrainerInfo GetFallbackTrainer()
+    {
+        if (CachedSettings == null)
+            throw new InvalidOperationException("AutoLegalityWrapper has not been initialized. Call EnsureInitialized first.");
+
+        return GetDefaultTrainer(CachedSettings);
     }
 
     private static void RegisterIfNoneExist(SimpleTrainerInfo fallback, byte generation, GameVersion version)

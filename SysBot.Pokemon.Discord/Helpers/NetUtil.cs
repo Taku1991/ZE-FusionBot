@@ -1,5 +1,6 @@
 using Discord;
 using PKHeX.Core;
+using SysBot.Pokemon;
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -33,7 +34,7 @@ public static class NetUtil
         {
             if (isMyg)
             {
-                pkm = MysteryGift.GetMysteryGift(buffer, extension)?.ConvertToPKM(defTrainer ?? new SimpleTrainerInfo());
+                pkm = MysteryGift.GetMysteryGift(buffer, extension)?.ConvertToPKM(defTrainer ?? AutoLegalityWrapper.GetFallbackTrainer());
             }
             else
             {
@@ -81,7 +82,7 @@ public static class NetUtil
             {
                 if (isMyg)
                 {
-                    pkm = MysteryGift.GetMysteryGift(buffer, extension)?.ConvertToPKM(defTrainer ?? new SimpleTrainerInfo());
+                    pkm = MysteryGift.GetMysteryGift(buffer, extension)?.ConvertToPKM(defTrainer ?? AutoLegalityWrapper.GetFallbackTrainer());
                 }
                 else
                 {
