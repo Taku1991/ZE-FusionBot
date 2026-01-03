@@ -869,10 +869,14 @@ public static class WebApiExtensions
         var type = _main.GetType();
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
-        // 1) Try direct field named FLP_Bots (common case)
-        var flpField = type.GetField("FLP_Bots", flags);
-        if (flpField?.GetValue(_main) is FlowLayoutPanel flpBots)
-            results.AddRange(flpBots.Controls.OfType<BotController>());
+        // 1) Try _botsForm.BotPanel first (current architecture)
+        var botsFormField = type.GetField("_botsForm", flags);
+        if (botsFormField?.GetValue(_main) is Form botsForm)
+        {
+            var botPanelProp = botsForm.GetType().GetProperty("BotPanel");
+            if (botPanelProp?.GetValue(botsForm) is FlowLayoutPanel flpBots)
+                results.AddRange(flpBots.Controls.OfType<BotController>());
+        }
 
         // 2) Scan all fields/properties for FlowLayoutPanel and collect BotController children
         foreach (var f in type.GetFields(flags))

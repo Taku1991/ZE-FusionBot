@@ -902,32 +902,37 @@ public static class UpdateManager
                 {
                     localMainForm.Invoke((MethodInvoker)(() =>
                     {
-                        var flpBotsField = localMainForm.GetType().GetField("FLP_Bots",
+                        // Access _botsForm field to get BotPanel
+                        var botsFormField = localMainForm.GetType().GetField("_botsForm",
                             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-                        if (flpBotsField?.GetValue(localMainForm) is FlowLayoutPanel flpBots)
+                        if (botsFormField?.GetValue(localMainForm) is Form botsForm)
                         {
-                            var controllers = flpBots.Controls.OfType<BotController>().ToList();
-                            idleStatus.TotalBots = controllers.Count;
-                            idleStatus.NonIdleBots.Clear();
-                            
-                            var idleCount = 0;
-                            foreach (var controller in controllers)
+                            var botPanelProperty = botsForm.GetType().GetProperty("BotPanel");
+                            if (botPanelProperty?.GetValue(botsForm) is FlowLayoutPanel flpBots)
                             {
-                                var state = controller.ReadBotState();
-                                var upperState = state?.ToUpperInvariant() ?? "";
-                                if (upperState == "IDLE" || upperState == "STOPPED")
+                                var controllers = flpBots.Controls.OfType<BotController>().ToList();
+                                idleStatus.TotalBots = controllers.Count;
+                                idleStatus.NonIdleBots.Clear();
+
+                                var idleCount = 0;
+                                foreach (var controller in controllers)
                                 {
-                                    idleCount++;
+                                    var state = controller.ReadBotState();
+                                    var upperState = state?.ToUpperInvariant() ?? "";
+                                    if (upperState == "IDLE" || upperState == "STOPPED")
+                                    {
+                                        idleCount++;
+                                    }
+                                    else
+                                    {
+                                        // Try to get bot name
+                                        var botName = $"Bot {controllers.IndexOf(controller) + 1}";
+                                        idleStatus.NonIdleBots.Add($"{botName}: {state}");
+                                    }
                                 }
-                                else
-                                {
-                                    // Try to get bot name
-                                    var botName = $"Bot {controllers.IndexOf(controller) + 1}";
-                                    idleStatus.NonIdleBots.Add($"{botName}: {state}");
-                                }
+                                idleStatus.IdleBots = idleCount;
                             }
-                            idleStatus.IdleBots = idleCount;
                         }
                     }));
                 }, cancellationToken);
@@ -1032,24 +1037,29 @@ public static class UpdateManager
             {
                 // Check local bots
                 if (mainForm == null) return true;
-                
+
                 return await Task.Run(() =>
                 {
                     var isIdle = true;
                     mainForm.Invoke((MethodInvoker)(() =>
                     {
-                        var flpBotsField = mainForm.GetType().GetField("FLP_Bots",
+                        // Access _botsForm field to get BotPanel (contains _FLP_Bots FlowLayoutPanel)
+                        var botsFormField = mainForm.GetType().GetField("_botsForm",
                             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                        
-                        if (flpBotsField?.GetValue(mainForm) is FlowLayoutPanel flpBots)
+
+                        if (botsFormField?.GetValue(mainForm) is Form botsForm)
                         {
-                            var controllers = flpBots.Controls.OfType<BotController>().ToList();
-                            isIdle = controllers.All(c =>
+                            var botPanelProperty = botsForm.GetType().GetProperty("BotPanel");
+                            if (botPanelProperty?.GetValue(botsForm) is FlowLayoutPanel flpBots)
                             {
-                                var state = c.ReadBotState();
-                                var upperState = state?.ToUpperInvariant() ?? "";
-                                return upperState == "IDLE" || upperState == "STOPPED";
-                            });
+                                var controllers = flpBots.Controls.OfType<BotController>().ToList();
+                                isIdle = controllers.All(c =>
+                                {
+                                    var state = c.ReadBotState();
+                                    var upperState = state?.ToUpperInvariant() ?? "";
+                                    return upperState == "IDLE" || upperState == "STOPPED";
+                                });
+                            }
                         }
                     }));
                     return isIdle;

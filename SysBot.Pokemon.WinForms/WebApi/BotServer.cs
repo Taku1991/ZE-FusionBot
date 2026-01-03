@@ -1510,10 +1510,14 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
             var type = _mainForm.GetType();
             var flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
 
-            // 1) Try direct field named FLP_Bots (legacy)
-            var flpField = type.GetField("FLP_Bots", flags);
-            if (flpField?.GetValue(_mainForm) is FlowLayoutPanel flp1)
-                results.AddRange(flp1.Controls.OfType<BotController>());
+            // 1) Try _botsForm.BotPanel first (current architecture)
+            var botsFormField = type.GetField("_botsForm", flags);
+            if (botsFormField?.GetValue(_mainForm) is Form botsForm)
+            {
+                var botPanelProp = botsForm.GetType().GetProperty("BotPanel");
+                if (botPanelProp?.GetValue(botsForm) is FlowLayoutPanel flp1)
+                    results.AddRange(flp1.Controls.OfType<BotController>());
+            }
 
             // 2) Scan all fields/properties on Main for FlowLayoutPanel
             foreach (var f in type.GetFields(flags))
@@ -1535,20 +1539,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                 }
             }
 
-            // 3) Try the common pattern: a private field/property _botsForm that contains BotPanel
-            var botsFormField = type.GetField("_botsForm", flags) ?? (MemberInfo?)type.GetProperty("_botsForm", flags);
-            if (botsFormField != null)
-            {
-                object? botsFormObj = null;
-                if (botsFormField is FieldInfo fi) botsFormObj = fi.GetValue(_mainForm);
-                else if (botsFormField is PropertyInfo pi) botsFormObj = pi.GetValue(_mainForm);
-                if (botsFormObj != null)
-                {
-                    var botPanelProp = botsFormObj.GetType().GetProperty("BotPanel", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (botPanelProp?.GetValue(botsFormObj) is FlowLayoutPanel botPanel)
-                        results.AddRange(botPanel.Controls.OfType<BotController>());
-                }
-            }
+            // Step 1 already handles _botsForm.BotPanel, so step 3 is now redundant
 
             // Final: dedupe and return
             return results.Distinct().ToList();

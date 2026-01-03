@@ -568,17 +568,22 @@ public static class RestartManager
     
     private static bool CheckLocalBotsIdle()
     {
-        var flpBotsField = _mainForm!.GetType().GetField("FLP_Bots",
+        // Access _botsForm field to get BotPanel
+        var botsFormField = _mainForm!.GetType().GetField("_botsForm",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            
-        if (flpBotsField?.GetValue(_mainForm) is FlowLayoutPanel flpBots)
+
+        if (botsFormField?.GetValue(_mainForm) is Form botsForm)
         {
-            var controllers = flpBots.Controls.OfType<BotController>().ToList();
-            return controllers.All(c =>
+            var botPanelProperty = botsForm.GetType().GetProperty("BotPanel");
+            if (botPanelProperty?.GetValue(botsForm) is FlowLayoutPanel flpBots)
             {
-                var state = c.ReadBotState();
-                return state == "IDLE" || state == "STOPPED";
-            });
+                var controllers = flpBots.Controls.OfType<BotController>().ToList();
+                return controllers.All(c =>
+                {
+                    var state = c.ReadBotState();
+                    return state == "IDLE" || state == "STOPPED";
+                });
+            }
         }
         return true;
     }
