@@ -987,7 +987,8 @@ public static class UpdateManager
 
         await Task.Run(() =>
         {
-            mainForm.BeginInvoke((MethodInvoker)(() =>
+            // Use Invoke instead of BeginInvoke to wait for the command to complete
+            mainForm.Invoke((MethodInvoker)(() =>
             {
                 var sendAllMethod = mainForm.GetType().GetMethod("SendAll",
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -1625,7 +1626,12 @@ public static class UpdateManager
     /// </summary>
     private static async Task<string> DownloadUpdateAsync(string downloadUrl, CancellationToken cancellationToken)
     {
-        string tempPath = Path.Combine(Path.GetTempPath(), $"SysBot.Pokemon.WinForms_{Guid.NewGuid()}.exe");
+        // Extract original filename from URL (e.g., "ZE_FusionBot.exe" from GitHub release)
+        var uri = new Uri(downloadUrl);
+        var originalFileName = Path.GetFileName(uri.LocalPath);
+
+        // Use original filename instead of hardcoded name
+        string tempPath = Path.Combine(Path.GetTempPath(), $"{Path.GetFileNameWithoutExtension(originalFileName)}_{Guid.NewGuid()}.exe");
 
         using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
         client.DefaultRequestHeaders.Add("User-Agent", "ZE-FusionBot");
@@ -1636,7 +1642,7 @@ public static class UpdateManager
         var fileBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
         await File.WriteAllBytesAsync(tempPath, fileBytes, cancellationToken);
 
-        LogUtil.LogInfo($"Downloaded {fileBytes.Length} bytes to {tempPath}", "UpdateManager");
+        LogUtil.LogInfo($"Downloaded {fileBytes.Length} bytes to {tempPath} (original: {originalFileName})", "UpdateManager");
         return tempPath;
     }
 
@@ -1650,6 +1656,10 @@ public static class UpdateManager
             string currentExePath = Application.ExecutablePath;
             string applicationDirectory = Path.GetDirectoryName(currentExePath) ?? "";
             string executableName = Path.GetFileName(currentExePath);
+
+            // Use ZE_FusionBot.exe as the target name (standardized name)
+            string targetExeName = "ZE_FusionBot.exe";
+            string targetExePath = Path.Combine(applicationDirectory, targetExeName);
             string backupPath = Path.Combine(applicationDirectory, $"{executableName}.backup");
 
             // Create batch file for update process
@@ -1657,7 +1667,7 @@ public static class UpdateManager
             string batchContent = @$"
 @echo off
 timeout /t 2 /nobreak >nul
-echo Updating SysBot...
+echo Updating ZE-FusionBot...
 rem Backup current version
 if exist ""{currentExePath}"" (
     if exist ""{backupPath}"" (
@@ -1665,10 +1675,10 @@ if exist ""{currentExePath}"" (
     )
     move ""{currentExePath}"" ""{backupPath}""
 )
-rem Install new version
-move ""{downloadedFilePath}"" ""{currentExePath}""
+rem Install new version with standardized name
+move ""{downloadedFilePath}"" ""{targetExePath}""
 rem Start new version
-start """" ""{currentExePath}""
+start """" ""{targetExePath}""
 rem Clean up
 del ""%~f0""
 ";

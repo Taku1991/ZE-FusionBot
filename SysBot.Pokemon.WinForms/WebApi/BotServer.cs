@@ -1416,7 +1416,9 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
     
     private void ExecuteMainFormCommand(BotControlCommand command)
     {
-        _mainForm.BeginInvoke((System.Windows.Forms.MethodInvoker)(() =>
+        // Use Invoke instead of BeginInvoke to ensure command completes before returning
+        // This ensures web interface commands are fully processed before sending response
+        _mainForm.Invoke((System.Windows.Forms.MethodInvoker)(() =>
         {
             const string methodName = "SendAll";
             if (AllowedMethods.Contains(methodName))
