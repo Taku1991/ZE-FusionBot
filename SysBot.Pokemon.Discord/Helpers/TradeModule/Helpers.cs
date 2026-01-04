@@ -221,6 +221,19 @@ public static class Helpers<T> where T : PKM, new()
             ApplyStandardItemLogic(pkm);
         }
 
+        // Align language and nickname before legality check to avoid false invalids
+        if (pkm is T pkBeforeCheck)
+        {
+            pkBeforeCheck.Language = finalLanguage;
+            if (string.IsNullOrEmpty(set.Nickname))
+            {
+                // Force default species nickname for the target language
+                var laNick = new LegalityAnalysis(pkBeforeCheck);
+                pkBeforeCheck.SetDefaultNickname(laNick);
+                pkBeforeCheck.IsNicknamed = false;
+            }
+        }
+
         // Generate LGPE code if needed
         List<Pictocodes>? lgcode = null;
         if (pkm is PB7)
@@ -239,13 +252,30 @@ public static class Helpers<T> where T : PKM, new()
         var la = new LegalityAnalysis(pkm);
 
         // Auto-fix language-related nickname mismatches for sets without a nickname
-        if (!la.Valid && string.IsNullOrEmpty(set.Nickname) && pkm.IsNicknamed)
+        if (!la.Valid && string.IsNullOrEmpty(set.Nickname))
         {
             if (la.Results.Any(r => r.Identifier is CheckIdentifier.Nickname))
             {
                 // Clear nickname and re-validate; prevents false invalid when trainer language != set language
                 _ = pkm.ClearNickname();
                 la = new LegalityAnalysis(pkm);
+            }
+        }
+
+        // Handle past gen file requests (PK8, PA8, PB8, PK9) - fix BEFORE returning error
+        if (!la.Valid && pkm is T && la.Results.Any(m => m.Identifier is CheckIdentifier.Memory))
+        {
+            var clone = (T)(object)pkm.Clone();
+            clone.HandlingTrainerName = pkm.OriginalTrainerName;
+            clone.HandlingTrainerGender = pkm.OriginalTrainerGender;
+            if (clone is PK8 or PA8 or PB8 or PK9)
+                ((dynamic)clone).HandlingTrainerLanguage = (byte)pkm.Language;
+            clone.CurrentHandler = 1;
+            var laClone = new LegalityAnalysis(clone);
+            if (laClone.Valid)
+            {
+                pkm = clone;
+                la = laClone;
             }
         }
 
@@ -467,6 +497,19 @@ public static class Helpers<T> where T : PKM, new()
 
         var la = new LegalityAnalysis(pk!);
 
+        // Auto-fix nickname-only issues on attachments by clearing nickname and re-validating
+        if (!la.Valid && la.Results.Any(r => r.Identifier is CheckIdentifier.Nickname))
+        {
+            var clone = (T)pk!.Clone();
+            _ = clone.ClearNickname();
+            var laNick = new LegalityAnalysis(clone);
+            if (laNick.Valid)
+            {
+                pk = clone;
+                la = laNick;
+            }
+        }
+
         if (!la.Valid)
         {
             string responseMessage;
@@ -500,21 +543,7 @@ public static class Helpers<T> where T : PKM, new()
             return;
         }
 
-        // Handle past gen file requests
-        if (!la.Valid)
-        {
-            if (la.Results.Any(m => m.Identifier is CheckIdentifier.Memory))
-            {
-                var clone = (T)pk!.Clone();
-                clone.HandlingTrainerName = pk.OriginalTrainerName;
-                clone.HandlingTrainerGender = pk.OriginalTrainerGender;
-                if (clone is PK8 or PA8 or PB8 or PK9)
-                    ((dynamic)clone).HandlingTrainerLanguage = (byte)pk.Language;
-                clone.CurrentHandler = 1;
-                la = new LegalityAnalysis(clone);
-                if (la.Valid) pk = clone;
-            }
-        }
+        // Past gen file fix is now handled in ProcessShowdownSetAsync before this point
 
         // Check if user has permission to use AutoOT (ALWAYS check, regardless of ignoreAutoOT value)
         if (SysCordSettings.Manager != null)
