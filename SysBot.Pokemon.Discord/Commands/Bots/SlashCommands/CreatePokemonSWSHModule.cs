@@ -10,6 +10,7 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// <summary>
 /// Slash command module for creating Sword/Shield (PK8) Pokemon with Gigantamax support
 /// </summary>
+[RequireContext(ContextType.Guild)]
 public class CreatePokemonSWSHModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
     /// <summary>

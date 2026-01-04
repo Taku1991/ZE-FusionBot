@@ -9,6 +9,7 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// <summary>
 /// Slash command module for creating Scarlet/Violet (PK9) Pokemon with Tera Type
 /// </summary>
+[RequireContext(ContextType.Guild)]
 public class CreatePokemonSVModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
     [SlashCommand("create-sv", "Create a Scarlet/Violet Pokemon with Tera Type")]

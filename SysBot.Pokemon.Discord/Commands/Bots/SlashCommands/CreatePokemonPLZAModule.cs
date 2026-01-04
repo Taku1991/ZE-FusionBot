@@ -9,6 +9,7 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// <summary>
 /// Slash command module for creating Legends: Z-A (PA9) Pokemon with Alpha support
 /// </summary>
+[RequireContext(ContextType.Guild)]
 public class CreatePokemonPLZAModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
     [SlashCommand("create-plza", "Create a Legends: Z-A Pokemon with Alpha support")]

@@ -9,6 +9,7 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// <summary>
 /// Slash command module for creating Brilliant Diamond/Shining Pearl (PB8) Pokemon
 /// </summary>
+[RequireContext(ContextType.Guild)]
 public class CreatePokemonBDSPModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
     [SlashCommand("create-bdsp", "Create a Brilliant Diamond/Shining Pearl Pokemon")]
