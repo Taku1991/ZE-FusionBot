@@ -11,7 +11,7 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// </summary>
 public class CreatePokemonSVModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
-    [SlashCommand("create-sv", "Create a Scarlet/Violet Pokemon with Tera Type", contextTypes: new[] { InteractionContextType.Guild })]
+    [SlashCommand("create-sv", "Create a Scarlet/Violet Pokemon with Tera Type")]
     public async Task CreatePokemonSVAsync(
         [Summary("pokemon", "Pokemon species")]
         [Autocomplete(typeof(PokemonAutocompleteSVHandler))]
@@ -60,6 +60,12 @@ public class CreatePokemonSVModule<T> : InteractionModuleBase<SocketInteractionC
         string? nature = null
     )
     {
+        if (Context.Guild == null)
+        {
+            await RespondAsync("❌ This command can only be used in a server.", ephemeral: true).ConfigureAwait(false);
+            return;
+        }
+
         await DeferAsync(ephemeral: false).ConfigureAwait(false);
 
         try

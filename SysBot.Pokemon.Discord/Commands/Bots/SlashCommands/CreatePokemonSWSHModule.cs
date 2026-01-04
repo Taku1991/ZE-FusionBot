@@ -51,7 +51,7 @@ public class CreatePokemonSWSHModule<T> : InteractionModuleBase<SocketInteractio
         Species.Urshifu,
     };
 
-    [SlashCommand("create-swsh", "Create a Sword/Shield Pokemon with Gigantamax support", contextTypes: new[] { InteractionContextType.Guild })]
+    [SlashCommand("create-swsh", "Create a Sword/Shield Pokemon with Gigantamax support")]
     public async Task CreatePokemonSWSHAsync(
         [Summary("pokemon", "Pokemon species")]
         [Autocomplete(typeof(PokemonAutocompleteSWSHHandler))]
@@ -81,6 +81,12 @@ public class CreatePokemonSWSHModule<T> : InteractionModuleBase<SocketInteractio
         string? nature = null
     )
     {
+        if (Context.Guild == null)
+        {
+            await RespondAsync("❌ This command can only be used in a server.", ephemeral: true).ConfigureAwait(false);
+            return;
+        }
+
         await DeferAsync(ephemeral: false).ConfigureAwait(false);
 
         try

@@ -11,7 +11,7 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// </summary>
 public class CreatePokemonPLAModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
-    [SlashCommand("create-pla", "Create a Legends: Arceus Pokemon with Alpha support", contextTypes: new[] { InteractionContextType.Guild })]
+    [SlashCommand("create-pla", "Create a Legends: Arceus Pokemon with Alpha support")]
     public async Task CreatePokemonPLAAsync(
         [Summary("pokemon", "Pokemon species")]
         [Autocomplete(typeof(PokemonAutocompletePLAHandler))]
@@ -42,6 +42,12 @@ public class CreatePokemonPLAModule<T> : InteractionModuleBase<SocketInteraction
         string? nature = null
     )
     {
+        if (Context.Guild == null)
+        {
+            await RespondAsync("❌ This command can only be used in a server.", ephemeral: true).ConfigureAwait(false);
+            return;
+        }
+
         await DeferAsync(ephemeral: false).ConfigureAwait(false);
 
         try

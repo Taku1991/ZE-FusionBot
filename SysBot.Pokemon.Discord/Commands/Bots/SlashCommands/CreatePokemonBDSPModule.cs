@@ -11,7 +11,7 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// </summary>
 public class CreatePokemonBDSPModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
-    [SlashCommand("create-bdsp", "Create a Brilliant Diamond/Shining Pearl Pokemon", contextTypes: new[] { InteractionContextType.Guild })]
+    [SlashCommand("create-bdsp", "Create a Brilliant Diamond/Shining Pearl Pokemon")]
     public async Task CreatePokemonBDSPAsync(
         [Summary("pokemon", "Pokemon species")]
         [Autocomplete(typeof(PokemonAutocompleteBDSPHandler))]
@@ -38,6 +38,12 @@ public class CreatePokemonBDSPModule<T> : InteractionModuleBase<SocketInteractio
         string? nature = null
     )
     {
+        if (Context.Guild == null)
+        {
+            await RespondAsync("❌ This command can only be used in a server.", ephemeral: true).ConfigureAwait(false);
+            return;
+        }
+
         await DeferAsync(ephemeral: false).ConfigureAwait(false);
 
         try

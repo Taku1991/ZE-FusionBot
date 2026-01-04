@@ -11,7 +11,7 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// </summary>
 public class CreatePokemonLGPEModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
-    [SlashCommand("create-lgpe", "Create a Let's Go Pikachu/Eevee Pokemon", contextTypes: new[] { InteractionContextType.Guild })]
+    [SlashCommand("create-lgpe", "Create a Let's Go Pikachu/Eevee Pokemon")]
     public async Task CreatePokemonLGPEAsync(
         [Summary("pokemon", "Pokemon species")]
         [Autocomplete(typeof(PokemonAutocompleteLGPEHandler))]
@@ -39,6 +39,12 @@ public class CreatePokemonLGPEModule<T> : InteractionModuleBase<SocketInteractio
         string? nature = null
     )
     {
+        if (Context.Guild == null)
+        {
+            await RespondAsync("❌ This command can only be used in a server.", ephemeral: true).ConfigureAwait(false);
+            return;
+        }
+
         await DeferAsync(ephemeral: false).ConfigureAwait(false);
 
         try
