@@ -10,7 +10,6 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// <summary>
 /// Slash command module for creating Sword/Shield (PK8) Pokemon with Gigantamax support
 /// </summary>
-[RequireContext(ContextType.Guild)]
 public class CreatePokemonSWSHModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
     /// <summary>
@@ -52,7 +51,7 @@ public class CreatePokemonSWSHModule<T> : InteractionModuleBase<SocketInteractio
         Species.Urshifu,
     };
 
-    [SlashCommand("create-swsh", "Create a Sword/Shield Pokemon with Gigantamax support")]
+    [SlashCommand("create-swsh", "Create a Sword/Shield Pokemon with Gigantamax support", contextTypes: new[] { InteractionContextType.Guild })]
     public async Task CreatePokemonSWSHAsync(
         [Summary("pokemon", "Pokemon species")]
         [Autocomplete(typeof(PokemonAutocompleteSWSHHandler))]

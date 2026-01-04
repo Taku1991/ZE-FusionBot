@@ -9,10 +9,9 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// <summary>
 /// Slash command module for creating Legends: Arceus (PA8) Pokemon with Alpha support
 /// </summary>
-[RequireContext(ContextType.Guild)]
 public class CreatePokemonPLAModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
-    [SlashCommand("create-pla", "Create a Legends: Arceus Pokemon with Alpha support")]
+    [SlashCommand("create-pla", "Create a Legends: Arceus Pokemon with Alpha support", contextTypes: new[] { InteractionContextType.Guild })]
     public async Task CreatePokemonPLAAsync(
         [Summary("pokemon", "Pokemon species")]
         [Autocomplete(typeof(PokemonAutocompletePLAHandler))]

@@ -9,10 +9,9 @@ namespace SysBot.Pokemon.Discord.Commands.Bots.SlashCommands;
 /// <summary>
 /// Slash command module for creating Let's Go Pikachu/Eevee (PB7) Pokemon
 /// </summary>
-[RequireContext(ContextType.Guild)]
 public class CreatePokemonLGPEModule<T> : InteractionModuleBase<SocketInteractionContext> where T : PKM, new()
 {
-    [SlashCommand("create-lgpe", "Create a Let's Go Pikachu/Eevee Pokemon")]
+    [SlashCommand("create-lgpe", "Create a Let's Go Pikachu/Eevee Pokemon", contextTypes: new[] { InteractionContextType.Guild })]
     public async Task CreatePokemonLGPEAsync(
         [Summary("pokemon", "Pokemon species")]
         [Autocomplete(typeof(PokemonAutocompleteLGPEHandler))]
