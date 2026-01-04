@@ -237,6 +237,18 @@ public static class Helpers<T> where T : PKM, new()
         }
 
         var la = new LegalityAnalysis(pkm);
+
+        // Auto-fix language-related nickname mismatches for sets without a nickname
+        if (!la.Valid && string.IsNullOrEmpty(set.Nickname) && pkm.IsNicknamed)
+        {
+            if (la.Results.Any(r => r.Identifier is CheckIdentifier.Nickname))
+            {
+                // Clear nickname and re-validate; prevents false invalid when trainer language != set language
+                _ = pkm.ClearNickname();
+                la = new LegalityAnalysis(pkm);
+            }
+        }
+
         if (pkm is not T pk || !la.Valid)
         {
             var reason = GetFailureReason(result, spec);
