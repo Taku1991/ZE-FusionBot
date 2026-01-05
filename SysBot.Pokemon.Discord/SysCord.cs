@@ -1,21 +1,22 @@
 using Discord;
 using Discord.Commands;
 using Discord.Interactions;
+using Discord.Net;
+using Discord.Rest;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
 using PKHeX.Core;
 using SysBot.Base;
+using SysBot.Pokemon.Discord.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using SysBot.Pokemon.Discord.Helpers;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using static Discord.GatewayIntents;
 using static SysBot.Pokemon.DiscordSettings;
-using Discord.Net;
 using CommandsRunMode = Discord.Commands.RunMode;
 using InteractionsRunMode = Discord.Interactions.RunMode;
 
@@ -105,7 +106,6 @@ public sealed partial class SysCord<T> where T : PKM, new()
                             shouldHandleStop = true;
                         }
                     }
-
                     if (shouldHandleStop)
                     {
                         await HandleBotStop();
@@ -127,12 +127,6 @@ public sealed partial class SysCord<T> where T : PKM, new()
             // (ex. checking Reactions, checking the content of edited/deleted messages),
             // you must set the MessageCacheSize. You may adjust the number as needed.
             //MessageCacheSize = 50,
-        });
-
-        _client = new DiscordSocketClient(new DiscordSocketConfig
-        {
-            LogLevel = LogSeverity.Info,
-            GatewayIntents = Guilds | GuildMessages | DirectMessages | GuildMembers | GuildPresences | MessageContent,
         });
 
         // ===== DM Relay Setup =====
@@ -396,7 +390,9 @@ public sealed partial class SysCord<T> where T : PKM, new()
     {
         try
         {
-            await AnnounceBotStatus("Online", EmbedColorOption.Green);
+            // Small delay to let Discord stabilize before announcing
+            await Task.Delay(1000).ConfigureAwait(false);
+            await AnnounceBotStatus("Online", EmbedColorOption.Green).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -408,7 +404,7 @@ public sealed partial class SysCord<T> where T : PKM, new()
     {
         try
         {
-            await AnnounceBotStatus("Offline", EmbedColorOption.Red);
+            await AnnounceBotStatus("Offline", EmbedColorOption.Red).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -471,8 +467,17 @@ public sealed partial class SysCord<T> where T : PKM, new()
                 await _commands.RemoveModuleAsync(module).ConfigureAwait(false);
         }
 
+        // Initialize Slash Commands (Interaction Modules)
+        await _interactions.AddModulesAsync(assembly, _services).ConfigureAwait(false);
+        foreach (var t in assembly.DefinedTypes.Where(z => z.IsSubclassOf(typeof(InteractionModuleBase<SocketInteractionContext>)) && z.IsGenericType))
+        {
+            var genModule = t.MakeGenericType(typeof(T));
+            await _interactions.AddModuleAsync(genModule, _services).ConfigureAwait(false);
+        }
+
         // Subscribe a handler to see if a message invokes a command.
         _client.Ready += LoadLoggingAndEcho;
+        _client.Ready += RegisterSlashCommandsAsync;
         _client.MessageReceived += HandleMessageAsync;
         _client.InteractionCreated += HandleInteractionAsync;
     }

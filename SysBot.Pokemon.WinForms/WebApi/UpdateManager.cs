@@ -35,20 +35,20 @@ public static class UpdateManager
         Path.GetDirectoryName(Application.ExecutablePath) ?? Environment.CurrentDirectory,
         "update_state.json"
     );
-    
+
     // Store the configured web port
     private static int _configuredWebPort = 8080;
-    
+
     // Simplified configuration with reasonable defaults
     private static readonly UpdateConfig Config = new();
-    
+
     // Cached JsonSerializerOptions for performance
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         MaxDepth = 10 // Prevent deeply nested JSON attacks
     };
-    
+
     /// <summary>
     /// Configurable update settings
     /// </summary>
@@ -82,16 +82,16 @@ public static class UpdateManager
         public DateTime LastModified { get; set; } = DateTime.UtcNow;
         public IdleProgress? IdleProgress { get; set; }
         public string? CurrentUpdatingInstance { get; set; }
-        
+
         [JsonIgnore]
         public int TotalInstances => Instances.Count;
-        
+
         [JsonIgnore]
         public int CompletedInstances => Instances.Count(i => i.Status == InstanceStatus.Completed);
-        
+
         [JsonIgnore]
         public int FailedInstances => Instances.Count(i => i.Status == InstanceStatus.Failed);
-        
+
         [JsonIgnore]
         public bool IsStale => !IsComplete && (DateTime.UtcNow - StartTime) > TimeSpan.FromMinutes(30);
     }
@@ -175,7 +175,7 @@ public static class UpdateManager
         }
         _configuredWebPort = port;
     }
-    
+
     /// <summary>
     /// Get or load the current update state
     /// </summary>
@@ -184,7 +184,7 @@ public static class UpdateManager
         lock (_lock)
         {
             if (_state != null) return _state;
-            
+
             // Validate state file path to prevent directory traversal
             var safePath = ValidateAndSanitizePath(StateFilePath);
             if (safePath == null || !File.Exists(safePath))
@@ -195,7 +195,7 @@ public static class UpdateManager
             try
             {
                 var json = File.ReadAllText(safePath);
-                
+
                 // Limit file size to prevent DoS attacks
                 if (json.Length > 1024 * 1024) // 1MB limit
                 {
@@ -205,7 +205,7 @@ public static class UpdateManager
                 }
 
                 _state = JsonSerializer.Deserialize<UpdateState>(json, JsonOptions);
-                
+
                 // Check if state is stale
                 if (_state?.IsStale == true)
                 {
@@ -216,7 +216,7 @@ public static class UpdateManager
                     _state.Success = false;
                     SaveState();
                 }
-                
+
                 return _state;
             }
             catch (Exception ex)
@@ -232,9 +232,9 @@ public static class UpdateManager
     /// Start or resume an update process
     /// </summary>
     public static Task<UpdateState> StartOrResumeUpdateAsync(
-        Main? mainForm, 
-        int currentTcpPort, 
-        bool forceUpdate = false, 
+        Main? mainForm,
+        int currentTcpPort,
+        bool forceUpdate = false,
         CancellationToken cancellationToken = default)
     {
         // Validate input parameters
@@ -244,7 +244,7 @@ public static class UpdateManager
         }
 
         LogUtil.LogInfo("Starting update process", "UpdateManager");
-        
+
         // Check for existing state with proper locking
         UpdateState? existingState;
         lock (_lock)
@@ -254,9 +254,9 @@ public static class UpdateManager
             {
                 LogUtil.LogInfo($"Resuming existing update session {existingState.SessionId}", "UpdateManager");
                 // Return existing state immediately - background task will handle resume
-                _ = Task.Run(async () => 
+                _ = Task.Run(async () =>
                 {
-                    try 
+                    try
                     {
                         await ResumeUpdateAsync(mainForm, currentTcpPort, existingState, cancellationToken);
                     }
@@ -279,9 +279,9 @@ public static class UpdateManager
 
         // Start new update with the state created under lock
         var state = _state!;
-        _ = Task.Run(async () => 
+        _ = Task.Run(async () =>
         {
-            try 
+            try
             {
                 await ExecuteUpdateAsync(mainForm, currentTcpPort, forceUpdate, state, cancellationToken);
             }
@@ -310,7 +310,7 @@ public static class UpdateManager
         }
 
         LogUtil.LogInfo($"Starting single instance update for port {instancePort}", "UpdateManager");
-        
+
         CancellationTokenSource? cts = null;
         try
         {
@@ -349,7 +349,7 @@ public static class UpdateManager
 
             // Perform update
             await UpdateInstanceAsync(mainForm, instance, safeVersion, cts.Token);
-            
+
             return instance.Status == InstanceStatus.Completed;
         }
         catch (OperationCanceledException)
@@ -393,14 +393,14 @@ public static class UpdateManager
             {
                 versionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 versionCts.CancelAfter(Config.VersionCheckTimeoutMs);
-                
+
                 (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(false).WaitAsync(versionCts.Token);
             }
             finally
             {
                 versionCts?.Dispose();
             }
-            
+
             if (!forceUpdate && !updateAvailable)
             {
                 CompleteUpdate(state, true, "No updates available");
@@ -408,7 +408,7 @@ public static class UpdateManager
             }
 
             state.TargetVersion = latestVersion ?? "latest";
-            
+
             // Discover instances - scan TCP ports for all instances
             state.Instances = await DiscoverInstancesSimpleAsync(currentTcpPort);
             SaveState();
@@ -431,7 +431,7 @@ public static class UpdateManager
             // Update slaves first, then master
             var slaves = state.Instances.Where(i => !i.IsMaster).OrderBy(i => i.TcpPort).ToList();
             var master = state.Instances.FirstOrDefault(i => i.IsMaster);
-            
+
             // Log the update order for debugging
             LogUtil.LogInfo($"Update order - Slaves: {string.Join(", ", slaves.Select(s => s.TcpPort))}, Master: {master?.TcpPort ?? 0}", "UpdateManager");
 
@@ -462,9 +462,9 @@ public static class UpdateManager
             state.Phase = UpdatePhase.Verifying;
             state.Message = "Verifying updates...";
             SaveState();
-            
+
             await Task.Delay(3000, cancellationToken); // Let system stabilize
-            
+
             var allSuccess = state.Instances.All(i => i.Status == InstanceStatus.Completed);
             CompleteUpdate(state, allSuccess, allSuccess ? "Update completed successfully" : "Update completed with errors");
         }
@@ -501,7 +501,7 @@ public static class UpdateManager
                     // Always check master version after restart
                     var currentVersion = GetCurrentVersion();
                     LogUtil.LogInfo($"Checking master after restart: current={currentVersion}, target={state.TargetVersion}, master status={master.Status}", "UpdateManager");
-                    
+
                     // If we're running and the version matches target, the update was successful
                     if (currentVersion == state.TargetVersion)
                     {
@@ -538,7 +538,7 @@ public static class UpdateManager
             // Verify all updates
             state.Phase = UpdatePhase.Verifying;
             await Task.Delay(3000, cancellationToken);
-            
+
             var allSuccess = state.Instances.All(i => i.Status == InstanceStatus.Completed);
             CompleteUpdate(state, allSuccess, allSuccess ? "Update resumed and completed" : "Update resumed with errors");
         }
@@ -626,7 +626,7 @@ public static class UpdateManager
                                                         Path.GetDirectoryName(proc.MainModule?.FileName ?? "") ?? "",
                                                         $"ZE_FusionBot_{proc.Id}.port"
                                                     );
-                                                    
+
                                                     if (File.Exists(portFile))
                                                     {
                                                         var portText = File.ReadAllText(portFile).Trim();
@@ -667,7 +667,7 @@ public static class UpdateManager
 
         // Wait for all scan tasks to complete
         var scanResults = await Task.WhenAll(scanTasks);
-        
+
         // Add discovered instances
         foreach (var instance in scanResults.Where(i => i != null))
         {
@@ -703,7 +703,7 @@ public static class UpdateManager
                     if (safePortFile != null && File.Exists(safePortFile))
                     {
                         var portText = File.ReadAllText(safePortFile).Trim();
-                        
+
                         // Validate port text to prevent injection
                         if (portText.Length <= 10 && int.TryParse(portText, out var port) && port > 0 && port <= 65535)
                         {
@@ -824,7 +824,7 @@ public static class UpdateManager
         while (DateTime.UtcNow < endTime && !cancellationToken.IsCancellationRequested)
         {
             var allStopped = true;
-            
+
             // Update idle progress for each instance
             if (_state?.IdleProgress != null)
             {
@@ -897,7 +897,7 @@ public static class UpdateManager
                     idleStatus.IdleBots = 0;
                     return;
                 }
-                
+
                 await Task.Run(() =>
                 {
                     localMainForm.Invoke((MethodInvoker)(() =>
@@ -949,7 +949,7 @@ public static class UpdateManager
                         var bots = botsData["Bots"];
                         idleStatus.TotalBots = bots.Count;
                         idleStatus.NonIdleBots.Clear();
-                        
+
                         var idleCount = 0;
                         for (int i = 0; i < bots.Count; i++)
                         {
@@ -1183,14 +1183,14 @@ public static class UpdateManager
                 instance.UpdateEndTime = DateTime.UtcNow;
                 instance.Version = targetVersion;
                 SaveState();
-                
+
                 LogUtil.LogInfo($"Instance on port {instance.TcpPort} updated successfully", "UpdateManager");
                 return;
             }
             catch (Exception ex)
             {
                 LogUtil.LogError($"Update attempt {retry + 1} failed: {ex.Message}", "UpdateManager");
-                
+
                 if (retry == Config.MaxRetryCount - 1)
                 {
                     instance.Status = InstanceStatus.Failed;
@@ -1199,7 +1199,7 @@ public static class UpdateManager
                     SaveState();
                     throw;
                 }
-                
+
                 await Task.Delay((retry + 1) * 1000, cancellationToken); // Exponential backoff
             }
         }
@@ -1213,11 +1213,11 @@ public static class UpdateManager
         // Wait for old process to terminate
         var terminateTimeout = TimeSpan.FromSeconds(Config.ProcessTerminationTimeoutSeconds);
         var terminateEndTime = DateTime.UtcNow.Add(terminateTimeout);
-        
+
         while (DateTime.UtcNow < terminateEndTime)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            
+
             try
             {
                 using var process = Process.GetProcessById(instance.ProcessId);
@@ -1227,27 +1227,27 @@ public static class UpdateManager
             {
                 break; // Process no longer exists
             }
-            
+
             await Task.Delay(1000, cancellationToken);
         }
 
         // Wait for new process to start
         var startTimeout = TimeSpan.FromMinutes(Config.NewProcessStartTimeoutMinutes);
         var startEndTime = DateTime.UtcNow.Add(startTimeout);
-        
+
         while (DateTime.UtcNow < startEndTime)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            
+
             if (IsPortResponding(instance.TcpPort))
             {
                 LogUtil.LogInfo($"New process started on port {instance.TcpPort}", "UpdateManager");
                 return;
             }
-            
+
             await Task.Delay(2000, cancellationToken);
         }
-        
+
         throw new TimeoutException("New process did not start within timeout");
     }
 
@@ -1277,7 +1277,7 @@ public static class UpdateManager
     private static void CompleteUpdate(UpdateState state, bool success, string message)
     {
         LogUtil.LogInfo($"Update complete: {message}", "UpdateManager");
-        
+
         state.Phase = UpdatePhase.Complete;
         state.Message = message;
         state.IsComplete = true;
@@ -1299,7 +1299,7 @@ public static class UpdateManager
                     {
                         if (File.Exists(StateFilePath))
                             File.Delete(StateFilePath);
-                        
+
                         var baseDir = Path.GetDirectoryName(Application.ExecutablePath) ?? "";
                         var updateFlagPath = Path.Combine(baseDir, "update_in_progress.flag");
                         var safeFlagPath = ValidateAndSanitizePath(updateFlagPath);
@@ -1360,7 +1360,7 @@ public static class UpdateManager
         var state = GetCurrentState();
         return state != null && !state.IsComplete;
     }
-    
+
     /// <summary>
     /// Clear the current update session
     /// </summary>
@@ -1383,7 +1383,7 @@ public static class UpdateManager
             }
         }
     }
-    
+
     /// <summary>
     /// Force complete a stuck update session by checking actual versions
     /// </summary>
@@ -1397,7 +1397,7 @@ public static class UpdateManager
                 // Check actual current version
                 var currentVersion = GetCurrentVersion();
                 LogUtil.LogInfo($"Force completing update: current version={currentVersion}, target={state.TargetVersion}", "UpdateManager");
-                
+
                 // Fix master instance status based on actual version
                 var master = state.Instances.FirstOrDefault(i => i.IsMaster);
                 if (master != null && master.Status != InstanceStatus.Completed)
@@ -1416,17 +1416,17 @@ public static class UpdateManager
                         LogUtil.LogError($"Master instance marked as failed: {master.Error}", "UpdateManager");
                     }
                 }
-                
+
                 // Check if all instances are complete
                 var allSuccess = state.Instances.All(i => i.Status == InstanceStatus.Completed);
-                
+
                 // Complete the update
                 state.Phase = UpdatePhase.Complete;
                 state.IsComplete = true;
                 state.Success = allSuccess;
                 state.Message = allSuccess ? "Update completed successfully (forced)" : "Update completed with errors (forced)";
                 state.LastModified = DateTime.UtcNow;
-                
+
                 SaveState();
                 LogUtil.LogInfo($"Update session force completed: success={allSuccess}", "UpdateManager");
             }
@@ -1466,12 +1466,12 @@ public static class UpdateManager
         {
             var baseDir = Path.GetDirectoryName(Application.ExecutablePath) ?? "";
             var portFile = Path.Combine(baseDir, $"ZE_FusionBot_{Environment.ProcessId}.port");
-            
+
             var safePortFile = ValidateAndSanitizePath(portFile);
             if (safePortFile != null && File.Exists(safePortFile))
             {
                 var portText = File.ReadAllText(safePortFile).Trim();
-                
+
                 // Validate port text length and content
                 if (portText.Length <= 10 && int.TryParse(portText, out var port) && port > 0 && port <= 65535)
                 {
@@ -1480,7 +1480,7 @@ public static class UpdateManager
             }
         }
         catch { }
-        
+
         // Default to master port
         return Config.MasterTcpPort;
     }
@@ -1505,7 +1505,7 @@ public static class UpdateManager
 
             // Get the full path and normalize it
             var fullPath = Path.GetFullPath(path);
-            
+
             // Get the expected base directory
             var baseDir = Path.GetDirectoryName(Application.ExecutablePath) ?? Environment.CurrentDirectory;
             var basePath = Path.GetFullPath(baseDir);
@@ -1536,7 +1536,7 @@ public static class UpdateManager
 
         // Allow only alphanumeric characters, dots, hyphens, and underscores
         var sanitized = UpdateManagerRegexHelper.VersionSanitizer().Replace(version, "");
-        
+
         // Limit length to prevent buffer overflow
         if (sanitized.Length > 50)
             sanitized = sanitized[..50];
@@ -1556,18 +1556,18 @@ public static class UpdateManager
             // Try to connect to the web server and check if it's us
             using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(1) };
             var response = await client.GetAsync($"http://localhost:{_configuredWebPort}/api/bot/instances");
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(json);
-                
+
                 // Check if the current process is marked as master
                 if (doc.RootElement.TryGetProperty("instances", out var instances))
                 {
                     foreach (var inst in instances.EnumerateArray())
                     {
-                        if (inst.TryGetProperty("processId", out var pidElement) && 
+                        if (inst.TryGetProperty("processId", out var pidElement) &&
                             inst.TryGetProperty("isMaster", out var isMaster))
                         {
                             if (pidElement.GetInt32() == Environment.ProcessId && isMaster.GetBoolean())
@@ -1578,7 +1578,7 @@ public static class UpdateManager
                     }
                 }
             }
-            
+
             // Fallback: check if we can bind to the configured port
             using var tcpListener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, _configuredWebPort);
             tcpListener.Start();
@@ -1602,12 +1602,12 @@ public static class UpdateManager
             // Query the web server to find master instance
             using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(2) };
             var response = await client.GetAsync($"http://localhost:{_configuredWebPort}/api/bot/instances");
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(json);
-                
+
                 if (doc.RootElement.TryGetProperty("instances", out var instances))
                 {
                     foreach (var inst in instances.EnumerateArray())
@@ -1627,7 +1627,7 @@ public static class UpdateManager
         {
             LogUtil.LogInfo($"Could not determine master port via API: {ex.Message}", "UpdateManager");
         }
-        
+
         return 0; // Not found
     }
 

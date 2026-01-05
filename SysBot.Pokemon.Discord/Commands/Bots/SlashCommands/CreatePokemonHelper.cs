@@ -130,7 +130,7 @@ public static class CreatePokemonHelper
         if (!string.IsNullOrEmpty(processed.Error) || processed.Pokemon == null)
         {
             var errorMsg = processed.Error ?? "Unknown error occurred during Pokemon generation.";
-            await context.Interaction.FollowupAsync($"ƒ?O {errorMsg}", ephemeral: true).ConfigureAwait(false);
+            await context.Interaction.FollowupAsync($"❌ {errorMsg}", ephemeral: true).ConfigureAwait(false);
             return false;
         }
 

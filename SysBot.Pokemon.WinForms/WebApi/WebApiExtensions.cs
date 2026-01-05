@@ -44,24 +44,24 @@ public static class WebApiExtensions
         if (Main.Config?.Hub?.WebServer != null)
         {
             _webPort = Main.Config.Hub.WebServer.ControlPanelPort;
-            
+
             // Validate port range
             if (_webPort < 1 || _webPort > 65535)
             {
                 LogUtil.LogError("WebServer", $"Invalid web server port {_webPort}. Using default port 8080.");
                 _webPort = 8080;
             }
-            
+
             // Update the UpdateManager with the configured port
             UpdateManager.SetConfiguredWebPort(_webPort);
-            
+
             // Check if web server is enabled
             if (!Main.Config.Hub.WebServer.EnableWebServer)
             {
                 LogUtil.LogInfo("WebServer", "Web Control Panel is disabled in settings.");
                 return;
             }
-            
+
             LogUtil.LogInfo("WebServer", $"Web Control Panel will be hosted on port {_webPort}");
         }
         else
@@ -98,7 +98,7 @@ public static class WebApiExtensions
                         await UpdateManager.StartOrResumeUpdateAsync(mainForm, _tcpPort);
                     }
                 });
-                
+
                 return;
             }
 
@@ -123,7 +123,7 @@ public static class WebApiExtensions
                     await UpdateManager.StartOrResumeUpdateAsync(mainForm, _tcpPort);
                 }
             });
-            
+
             // Periodically clean up completed update sessions
             _ = Task.Run(async () =>
             {
@@ -309,9 +309,9 @@ public static class WebApiExtensions
     private static void StartTcpOnly()
     {
         StartTcp();
-        
+
         // Slaves no longer need their own web server - logs are read directly from file by master
-        
+
         CreatePortFile();
     }
 
@@ -337,21 +337,21 @@ public static class WebApiExtensions
         _cts ??= new CancellationTokenSource(); // Only create if not already created
         Task.Run(() => StartTcpListenerAsync(_cts.Token));
     }
-    
+
     private static async Task StartTcpListenerAsync(CancellationToken cancellationToken)
     {
         const int maxRetries = 5;
         var random = new Random();
-        
+
         for (int retry = 0; retry < maxRetries && !cancellationToken.IsCancellationRequested; retry++)
         {
             try
             {
                 _tcp = new TcpListener(System.Net.IPAddress.Loopback, _tcpPort);
                 _tcp.Start();
-                
+
                 LogUtil.LogInfo("TCP", $"TCP listener started successfully on port {_tcpPort}");
-                
+
                 await AcceptClientsAsync(cancellationToken);
                 break;
             }
@@ -359,14 +359,14 @@ public static class WebApiExtensions
             {
                 LogUtil.LogInfo("TCP", $"TCP port {_tcpPort} in use, finding new port (attempt {retry + 1}/{maxRetries})");
                 await Task.Delay(random.Next(500, 1500), cancellationToken);
-                
+
                 lock (_portLock)
                 {
                     ReleasePort(_tcpPort);
                     _tcpPort = FindAvailablePort(_tcpPort + 1);
                     ReservePort(_tcpPort);
                 }
-                
+
                 CreatePortFile();
             }
             catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
@@ -376,7 +376,7 @@ public static class WebApiExtensions
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
                 LogUtil.LogError("TCP", $"TCP listener error: {ex.Message}");
-                
+
                 if (retry == maxRetries - 1)
                 {
                     LogUtil.LogError("TCP", $"Failed to start TCP listener after {maxRetries} attempts");
@@ -465,7 +465,7 @@ public static class WebApiExtensions
             LogUtil.LogError("TCP", $"Error handling TCP client: {ex.Message}");
         }
     }
-    
+
     private static async Task<string> ProcessCommandAsync(string command)
     {
         return await Task.Run(() => ProcessCommand(command));
@@ -506,7 +506,7 @@ public static class WebApiExtensions
 
     private static volatile bool _updateInProgress = false;
     private static readonly object _updateLock = new();
-    
+
     private static string TriggerUpdate()
     {
         try
@@ -586,7 +586,7 @@ public static class WebApiExtensions
         {
             var config = RestartManager.GetScheduleConfig();
             var nextRestart = RestartManager.NextScheduledRestart;
-            
+
             return System.Text.Json.JsonSerializer.Serialize(new
             {
                 config.Enabled,
@@ -614,7 +614,7 @@ public static class WebApiExtensions
             return $"ERROR: Failed to execute {command} - {ex.Message}";
         }
     }
-    
+
     private static void ExecuteMainFormMethod(string methodName, params object[] args)
     {
         _main!.BeginInvoke((System.Windows.Forms.MethodInvoker)(() =>
@@ -755,44 +755,44 @@ public static class WebApiExtensions
             return $"ERROR: Failed to get instance info - {ex.Message}";
         }
     }
-    
+
     private static string HandleRemoteButton(string[] parts)
     {
         try
         {
             if (parts.Length < 3)
                 return "ERROR: Invalid command format. Expected REMOTE_BUTTON:button:botIndex";
-                
+
             var button = parts[1];
             if (!int.TryParse(parts[2], out var botIndex))
                 return "ERROR: Invalid bot index";
-                
+
             var controllers = GetBotControllers();
             if (botIndex < 0 || botIndex >= controllers.Count)
                 return $"ERROR: Bot index {botIndex} out of range";
-                
+
             var botController = controllers[botIndex];
             var botSource = botController.GetBot();
-            
+
             if (botSource?.Bot == null)
                 return $"ERROR: Bot at index {botIndex} not available";
-                
+
             if (!botSource.IsRunning)
                 return $"ERROR: Bot at index {botIndex} is not running";
-                
+
             var bot = botSource.Bot;
             if (bot.Connection is not ISwitchConnectionAsync connection)
                 return "ERROR: Bot connection not available";
-            
+
             var switchButton = MapButtonToSwitch(button);
             if (switchButton == null)
                 return $"ERROR: Invalid button: {button}";
-            
+
             var cmd = SwitchCommand.Click(switchButton.Value);
-            
+
             // Execute the command synchronously since we're already in a background thread
             Task.Run(async () => await connection.SendAsync(cmd, CancellationToken.None)).Wait();
-            
+
             return $"OK: Button {button} pressed on bot {botIndex}";
         }
         catch (Exception ex)
@@ -800,31 +800,31 @@ public static class WebApiExtensions
             return $"ERROR: {ex.Message}";
         }
     }
-    
+
     private static string HandleRemoteMacro(string[] parts)
     {
         try
         {
             if (parts.Length < 3)
                 return "ERROR: Invalid command format. Expected REMOTE_MACRO:macro:botIndex";
-                
+
             var macro = parts[1];
             if (!int.TryParse(parts[2], out var botIndex))
                 return "ERROR: Invalid bot index";
-                
+
             var controllers = GetBotControllers();
             if (botIndex < 0 || botIndex >= controllers.Count)
                 return $"ERROR: Bot index {botIndex} out of range";
-                
+
             var botController = controllers[botIndex];
             var botSource = botController.GetBot();
-            
+
             if (botSource?.Bot == null)
                 return $"ERROR: Bot at index {botIndex} not available";
-                
+
             if (!botSource.IsRunning)
                 return $"ERROR: Bot at index {botIndex} is not running";
-                
+
             // For now, just return success - macro implementation can be added later
             return $"OK: Macro {macro} executed on bot {botIndex}";
         }
@@ -833,7 +833,7 @@ public static class WebApiExtensions
             return $"ERROR: {ex.Message}";
         }
     }
-    
+
     private static SwitchButton? MapButtonToSwitch(string button)
     {
         return button.ToUpperInvariant() switch
@@ -1120,7 +1120,7 @@ public static class WebApiExtensions
 
             string operation = isPostRestart ? "restart" : "update";
             string logSource = isPostRestart ? "RestartManager" : "UpdateManager";
-            
+
             LogUtil.LogInfo($"Post-{operation} startup detected. Waiting for all instances to come online...", logSource);
 
             if (isPostRestart) File.Delete(restartFlagPath);
@@ -1133,22 +1133,22 @@ public static class WebApiExtensions
             LogUtil.LogError("StartupManager", $"Error checking post-restart/update startup: {ex.Message}");
         }
     }
-    
+
     private static async Task HandlePostOperationStartupAsync(Main mainForm, string operation, string logSource)
     {
         await Task.Delay(5000);
-        
+
         const int maxAttempts = 12;
         for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
             try
             {
                 LogUtil.LogInfo($"Post-{operation} check attempt {attempt + 1}/{maxAttempts}", logSource);
-                
+
                 // Start local bots
                 ExecuteMainFormMethod("SendAll", BotControlCommand.Start);
                 LogUtil.LogInfo("Start All command sent to local bots", logSource);
-                
+
                 // Start remote instances
                 var instances = GetAllRunningInstances(0);
                 if (instances.Count > 0)
@@ -1156,7 +1156,7 @@ public static class WebApiExtensions
                     LogUtil.LogInfo($"Found {instances.Count} remote instances online. Sending Start All command...", logSource);
                     await SendStartCommandsToRemoteInstancesAsync(instances, logSource);
                 }
-                
+
                 LogUtil.LogInfo($"Post-{operation} Start All commands completed successfully", logSource);
                 break;
             }
@@ -1168,7 +1168,7 @@ public static class WebApiExtensions
             }
         }
     }
-    
+
     private static async Task SendStartCommandsToRemoteInstancesAsync(List<(int Port, int ProcessId)> instances, string logSource)
     {
         var tasks = instances.Select(instance => Task.Run(() =>
@@ -1183,7 +1183,7 @@ public static class WebApiExtensions
                 LogUtil.LogError($"Failed to send start command to port {instance.Port}: {ex.Message}", logSource);
             }
         }));
-        
+
         await Task.WhenAll(tasks);
     }
 
