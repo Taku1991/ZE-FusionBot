@@ -288,6 +288,17 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
                 (200, await HandleRemoteButton(request, ExtractPort(p)), "application/json"),
             var p when p.StartsWith("/api/bot/instances/") && p.EndsWith("/remote/macro") =>
                 (200, await HandleRemoteMacro(request, ExtractPort(p)), "application/json"),
+
+            // Trade API Endpoints
+            "/api/trade/submit" when request.HttpMethod == "POST" =>
+                (200, await TradeEndpoints.SubmitTrade(request), "application/json"),
+            "/api/trade/health" =>
+                (200, TradeEndpoints.GetHealth(), "application/json"),
+            var p when p.StartsWith("/api/trade/status/") =>
+                (200, TradeEndpoints.GetTradeStatus(p.Substring("/api/trade/status/".Length)), "application/json"),
+            var p when p.StartsWith("/api/trade/") && p.EndsWith("/cancel") && request.HttpMethod == "POST" =>
+                (200, await TradeEndpoints.CancelTrade(request, ExtractTradeId(p)), "application/json"),
+
             "/icon.ico" => (200, GetIconBytes(), "image/x-icon"),
             "/LeftJoyCon.png" => (200, LoadEmbeddedResourceBinary("LeftJoyCon.png"), "image/png"),
             "/RightJoyCon.png" => (200, LoadEmbeddedResourceBinary("RightJoyCon.png"), "image/png"),
@@ -851,6 +862,22 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
             };
 
             return JsonSerializer.Serialize(response, JsonOptions);
+        }
+    }
+
+    private static string ExtractTradeId(string path)
+    {
+        try
+        {
+            // Extract trade ID from path like "/api/trade/{tradeId}/cancel"
+            var parts = path.Split('/');
+            if (parts.Length >= 4)
+                return parts[3]; // tradeId is at index 3
+            return "";
+        }
+        catch
+        {
+            return "";
         }
     }
 
@@ -1667,13 +1694,34 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
             "http://localhost",
             "https://localhost",
             "http://127.0.0.1",
-            "https://127.0.0.1"
+            "https://127.0.0.1",
+            // Production domains
+            "https://www.hideout-pk.de",
+            "https://hideout-pk.de",
+            // Homepage VM - local network (FAST!)
+            "http://10.0.10.20:3000",
+            "http://10.0.10.20",
+            // Homepage VM - Tailscale (fallback)
+            "http://100.107.62.27:3000",
+            "http://100.107.62.27",
+            // Bot VM local IP
+            "http://10.0.10.37",
         };
 
         // Allow localhost with any port
         if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
         {
             if (uri.Host == "localhost" || uri.Host == "127.0.0.1")
+            {
+                return true;
+            }
+            // Allow local network IPs (10.0.10.x)
+            if (uri.Host.StartsWith("10.0.10.", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            // Allow Tailscale IPs (100.x.x.x)
+            if (uri.Host.StartsWith("100.", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

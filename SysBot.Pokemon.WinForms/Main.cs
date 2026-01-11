@@ -36,6 +36,15 @@ namespace SysBot.Pokemon.WinForms
         // Current running environment
         private IPokeBotRunner RunningEnvironment { get; set; }
 
+        /// <summary>
+        /// Gets the running bot environment (for WebAPI access)
+        /// </summary>
+        public static IPokeBotRunner? GetBotRunner()
+        {
+            var main = Application.OpenForms.OfType<Main>().FirstOrDefault();
+            return main?.RunningEnvironment;
+        }
+
         // Program configuration
         [Browsable(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)] // Do not serialize in the designer

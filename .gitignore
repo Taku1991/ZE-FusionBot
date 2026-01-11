@@ -364,3 +364,7 @@ PokeBot/
 /Test_Releaese/
 /ZE-FusionBot-main/
 Anleitung.md
+
+# Configuration files with sensitive data
+**/appsettings.json
+!**/appsettings.example.json
