@@ -240,7 +240,7 @@ namespace SysBot.Pokemon.WinForms
 
             try
             {
-                var (updateAvailable, _, _) = await UpdateChecker.CheckForUpdatesAsync(); // Check for updates
+                var (updateAvailable, _, _, _) = await UpdateChecker.CheckForUpdatesAsync(); // Check for updates
                 hasUpdate = updateAvailable; // If there's an update, this flag gets checked
             }
             catch { }

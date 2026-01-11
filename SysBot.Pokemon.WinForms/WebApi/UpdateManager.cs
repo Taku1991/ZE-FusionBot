@@ -74,6 +74,7 @@ public static class UpdateManager
         public DateTime StartTime { get; set; } = DateTime.UtcNow;
         public string TargetVersion { get; set; } = string.Empty;
         public string CurrentVersion { get; set; } = string.Empty;
+        public string? DownloadUrl { get; set; } = string.Empty;
         public UpdatePhase Phase { get; set; } = UpdatePhase.Checking;
         public string Message { get; set; } = "Initializing...";
         public List<Instance> Instances { get; set; } = [];
@@ -319,7 +320,7 @@ public static class UpdateManager
             cts.CancelAfter(TimeSpan.FromMinutes(Config.NewProcessStartTimeoutMinutes));
 
             // Check for updates first with timeout
-            var (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(false);
+            var (updateAvailable, _, latestVersion, _) = await UpdateChecker.CheckForUpdatesAsync(false);
             if (!updateAvailable)
             {
                 LogUtil.LogInfo("No updates available", "UpdateManager");
@@ -388,13 +389,14 @@ public static class UpdateManager
             // Check for updates with timeout
             bool updateAvailable;
             string? latestVersion;
+            string? downloadUrl;
             CancellationTokenSource? versionCts = null;
             try
             {
                 versionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 versionCts.CancelAfter(Config.VersionCheckTimeoutMs);
 
-                (updateAvailable, _, latestVersion) = await UpdateChecker.CheckForUpdatesAsync(false).WaitAsync(versionCts.Token);
+                (updateAvailable, _, latestVersion, downloadUrl) = await UpdateChecker.CheckForUpdatesAsync(false).WaitAsync(versionCts.Token);
             }
             finally
             {
@@ -408,6 +410,15 @@ public static class UpdateManager
             }
 
             state.TargetVersion = latestVersion ?? "latest";
+
+            // Store the download URL for this specific version
+            if (string.IsNullOrWhiteSpace(downloadUrl))
+            {
+                CompleteUpdate(state, false, "Failed to fetch download URL");
+                return;
+            }
+            state.DownloadUrl = downloadUrl;
+            LogUtil.LogInfo($"Download URL for version {state.TargetVersion}: {downloadUrl}", "UpdateManager");
 
             // Discover instances - scan TCP ports for all instances
             state.Instances = await DiscoverInstancesSimpleAsync(currentTcpPort);
@@ -1121,11 +1132,11 @@ public static class UpdateManager
                     // Master update - download and install update
                     LogUtil.LogInfo("Downloading update for master instance", "UpdateManager");
 
-                    // Download the update
-                    string? downloadUrl = await UpdateChecker.FetchDownloadUrlAsync();
+                    // Use the download URL stored in state
+                    string? downloadUrl = _state?.DownloadUrl;
                     if (string.IsNullOrWhiteSpace(downloadUrl))
                     {
-                        throw new Exception("Failed to fetch download URL from GitHub");
+                        throw new Exception("Download URL not available in state");
                     }
 
                     LogUtil.LogInfo($"Downloading update from: {downloadUrl}", "UpdateManager");

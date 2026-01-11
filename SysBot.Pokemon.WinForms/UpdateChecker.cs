@@ -19,24 +19,21 @@ namespace SysBot.Pokemon.WinForms
             Timeout = TimeSpan.FromSeconds(30)
         };
 
-        // Cache to prevent hitting GitHub API rate limits
-        private static ReleaseInfo? _cachedRelease;
-        private static DateTime _cacheExpiry = DateTime.MinValue;
-        private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(15);
-        private static readonly object _cacheLock = new();
-
         static UpdateChecker()
         {
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "ZE-FusionBot");
         }
 
-        public static async Task<(bool UpdateAvailable, bool UpdateRequired, string NewVersion)> CheckForUpdatesAsync(bool forceShow = false, bool showDialog = true)
+        public static async Task<(bool UpdateAvailable, bool UpdateRequired, string NewVersion, string? DownloadUrl)> CheckForUpdatesAsync(bool forceShow = false, bool showDialog = true)
         {
             ReleaseInfo? latestRelease = await FetchLatestReleaseAsync();
 
             bool updateAvailable = latestRelease != null && latestRelease.TagName != PokeBot.Version;
             bool updateRequired = latestRelease?.Prerelease == false && IsUpdateRequired(latestRelease?.Body);
             string? newVersion = latestRelease?.TagName;
+            string? downloadUrl = latestRelease?.Assets
+                ?.FirstOrDefault(a => a.Name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true)
+                ?.BrowserDownloadUrl;
 
             // Only show dialog if explicitly requested via forceShow (manual check)
             if (forceShow && showDialog)
@@ -45,7 +42,7 @@ namespace SysBot.Pokemon.WinForms
                 updateForm.ShowDialog();
             }
 
-            return (updateAvailable, updateRequired, newVersion ?? string.Empty);
+            return (updateAvailable, updateRequired, newVersion ?? string.Empty, downloadUrl);
         }
 
         public static async Task<string> FetchChangelogAsync()
@@ -65,21 +62,8 @@ namespace SysBot.Pokemon.WinForms
             ?.BrowserDownloadUrl;
         }
 
-        private static async Task<ReleaseInfo?> FetchLatestReleaseAsync(bool forceRefresh = false)
+        private static async Task<ReleaseInfo?> FetchLatestReleaseAsync()
         {
-            // Check cache first (unless force refresh)
-            if (!forceRefresh)
-            {
-                lock (_cacheLock)
-                {
-                    if (_cachedRelease != null && DateTime.UtcNow < _cacheExpiry)
-                    {
-                        Console.WriteLine($"Using cached release info: {_cachedRelease.TagName} (expires in {(_cacheExpiry - DateTime.UtcNow).TotalMinutes:F1} minutes)");
-                        return _cachedRelease;
-                    }
-                }
-            }
-
             try
             {
                 string releasesUrl = $"https://api.github.com/repos/{RepositoryOwner}/{RepositoryName}/releases/latest";
@@ -108,13 +92,7 @@ namespace SysBot.Pokemon.WinForms
 
                 if (releaseInfo != null)
                 {
-                    // Update cache
-                    lock (_cacheLock)
-                    {
-                        _cachedRelease = releaseInfo;
-                        _cacheExpiry = DateTime.UtcNow.Add(CacheDuration);
-                        Console.WriteLine($"Successfully fetched and cached release info: {releaseInfo.TagName} (cache valid for {CacheDuration.TotalMinutes} minutes)");
-                    }
+                    Console.WriteLine($"Successfully fetched release info: {releaseInfo.TagName}");
                 }
 
                 return releaseInfo;
@@ -123,33 +101,10 @@ namespace SysBot.Pokemon.WinForms
             {
                 Console.WriteLine($"Error fetching release info: {ex.Message}");
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");
-
-                // Return cached version as fallback if available
-                lock (_cacheLock)
-                {
-                    if (_cachedRelease != null)
-                    {
-                        Console.WriteLine($"Using stale cached release info as fallback: {_cachedRelease.TagName}");
-                        return _cachedRelease;
-                    }
-                }
-
                 return null;
             }
         }
 
-        /// <summary>
-        /// Clear the cached release info to force a fresh check on next call
-        /// </summary>
-        public static void ClearCache()
-        {
-            lock (_cacheLock)
-            {
-                _cachedRelease = null;
-                _cacheExpiry = DateTime.MinValue;
-                Console.WriteLine("Release info cache cleared");
-            }
-        }
 
         private static bool IsUpdateRequired(string? changelogBody)
         {
