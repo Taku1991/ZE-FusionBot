@@ -1491,8 +1491,8 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                 // -----------------------------
                 if (pk.Version == GameVersion.ZA)
                 {
-                    var sav = AutoLegalityWrapper.GetTrainerInfo<T>();
-                    var template = AutoLegalityWrapper.GetTemplate(set);
+                    sav = AutoLegalityWrapper.GetTrainerInfo<T>();
+                    template = AutoLegalityWrapper.GetTemplate(set);
 
                     // Always pass full IV array if present; otherwise default logic applies inside IVEnforcer
                     int[] requestedIVs =
