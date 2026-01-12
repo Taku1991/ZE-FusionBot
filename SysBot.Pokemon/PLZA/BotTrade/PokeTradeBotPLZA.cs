@@ -350,11 +350,23 @@ public class PokeTradeBotPLZA(PokeTradeHub<PA9> Hub, PokeBotState Config) : Poke
 
         if (!isMysteryGift)
         {
-            // Validate language ID - if invalid, default to English (2)
-            int language = tradePartner.Language;
-            if (language < 1 || language > 12) // Valid language IDs are 1-12
-                language = 2; // English
-            cln.Language = language;
+            // Only override language if Pokemon has default/config language
+            // If user explicitly requested a different language, preserve it
+            var configLanguage = (int)legalitySettings.GenerateLanguage;
+
+            // If Pokemon already has a non-default language (user explicitly requested it), keep it
+            if (toSend.Language != configLanguage && toSend.Language >= 1 && toSend.Language <= 12)
+            {
+                cln.Language = toSend.Language; // Preserve explicitly requested language
+            }
+            else
+            {
+                // Otherwise, use trade partner's language
+                int language = tradePartner.Language;
+                if (language < 1 || language > 12) // Valid language IDs are 1-12
+                    language = 2; // English
+                cln.Language = language;
+            }
         }
 
         ClearOTTrash(cln, tradePartner);
@@ -1399,9 +1411,22 @@ public class PokeTradeBotPLZA(PokeTradeHub<PA9> Hub, PokeBotState Config) : Poke
         Log($"[AutoOT Debug] UseTradePartnerInfo: {Hub.Config.Legality.UseTradePartnerInfo}, IgnoreAutoOT: {poke.IgnoreAutoOT}, CanUseAutoOT: {PokeBot.CanUseAutoOT(poke)}");
         if (Hub.Config.Legality.UseTradePartnerInfo && !poke.IgnoreAutoOT && PokeBot.CanUseAutoOT(poke))
         {
+            // Preserve explicitly requested language through AutoOT
+            var originalLanguage = toSend.Language;
+            var configLanguage = (int)Hub.Config.Legality.GenerateLanguage;
+            bool hasExplicitLanguage = originalLanguage != configLanguage && originalLanguage >= 1 && originalLanguage <= 12;
+
             Log($"Applying AutoOT: Changing OT from '{toSend.OriginalTrainerName}' to '{tradePartnerFullInfo.OT}'");
             toSend = await ApplyAutoOT(toSend, tradePartnerFullInfo, sav, token);
             Log($"AutoOT Applied: New OT is '{toSend.OriginalTrainerName}', TID: {toSend.DisplayTID}, SID: {toSend.DisplaySID}");
+
+            // Restore explicitly requested language if it was changed by AutoOT
+            if (hasExplicitLanguage && toSend.Language != originalLanguage)
+            {
+                toSend.Language = originalLanguage;
+                toSend.RefreshChecksum();
+            }
+
             // Note: ApplyAutoOT already writes the Pokemon to the box, so we don't need to do it again
             // Give game time to refresh trade offer display with AutoOT Pokemon
             await Task.Delay(3_000, token).ConfigureAwait(false);
