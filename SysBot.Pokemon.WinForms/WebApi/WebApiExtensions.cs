@@ -101,6 +101,9 @@ public static class WebApiExtensions
                     }
                 });
 
+                // Slaves don't start REST API - only Master does
+                LogUtil.LogInfo("WebServer", "Running as slave instance - REST API will be provided by master on port 8080");
+
                 return;
             }
 
