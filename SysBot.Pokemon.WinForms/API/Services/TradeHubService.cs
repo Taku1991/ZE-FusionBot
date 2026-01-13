@@ -29,6 +29,16 @@ public class TradeHubService
     }
 
     /// <summary>
+    /// Static method to process trade directly (called from TCP handler)
+    /// </summary>
+    public static async Task<TradeResponse> ProcessTradeDirectlyAsync(TradeRequest request)
+    {
+        // Create a temporary instance to handle the trade
+        var tempService = new TradeHubService(null!); // No SignalR for TCP-based trades
+        return await tempService.SubmitTradeAsync(request);
+    }
+
+    /// <summary>
     /// Submits a trade request to the bot system
     /// </summary>
     public async Task<TradeResponse> SubmitTradeAsync(TradeRequest request)
@@ -50,6 +60,17 @@ public class TradeHubService
 
         try
         {
+            // Check if this is the Master instance (port 8080)
+            // Master routes trades to the correct bot instance
+            if (IsMasterInstance())
+            {
+                LogUtil.LogInfo($"Master instance: Routing {request.Game} trade to correct bot instance", "TradeHubService");
+                return await RouteTradeToInstance(request, response);
+            }
+
+            // Slave instance: Process trade locally
+            LogUtil.LogInfo($"Slave instance: Processing {request.Game} trade locally", "TradeHubService");
+
             // Get the bot hub from Main config
             var hub = GetBotHub(request.Game);
             if (hub == null)
@@ -371,5 +392,221 @@ public class TradeHubService
             "LGPE" => 7,
             _ => 9
         };
+    }
+
+    /// <summary>
+    /// Checks if this is the Master instance (port 8080)
+    /// </summary>
+    private static bool IsMasterInstance()
+    {
+        // The Master is the one with the web control panel on port 8080
+        // We can check this via Main.Config or by checking if we have access to all instances
+        try
+        {
+            var config = Main.Config;
+            if (config?.Hub == null)
+                return false;
+
+            // Master has EnableWebServer = true and no specific Mode set (or is the coordinator)
+            // Slaves have a specific Mode (SV, BDSP, etc.)
+            var mode = config.Mode.ToString();
+
+            // If mode is not set or is default, this is likely master
+            // Better approach: Check if we can access GetAllRunningInstances
+            return mode == "Default" || mode == "None" || string.IsNullOrEmpty(mode);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Routes trade request to the correct bot instance via TCP
+    /// </summary>
+    private async Task<TradeResponse> RouteTradeToInstance(TradeRequest request, TradeResponse response)
+    {
+        try
+        {
+            // Find all running instances
+            var instances = GetAllBotInstances();
+
+            LogUtil.LogInfo($"Found {instances.Count} bot instances", "TradeHubService");
+
+            // Find the instance that handles this game
+            int? targetPort = null;
+            foreach (var (port, mode) in instances)
+            {
+                LogUtil.LogInfo($"Instance on port {port} handles game: {mode}", "TradeHubService");
+
+                if (mode.Equals(request.Game, StringComparison.OrdinalIgnoreCase))
+                {
+                    targetPort = port;
+                    break;
+                }
+            }
+
+            if (targetPort == null)
+            {
+                response.Status = TradeStatus.Failed;
+                response.ErrorMessage = $"No bot instance found for game: {request.Game}";
+                LogUtil.LogError($"No bot instance found for game: {request.Game}", "TradeHubService");
+                return response;
+            }
+
+            LogUtil.LogInfo($"Routing {request.Game} trade to instance on port {targetPort}", "TradeHubService");
+
+            // Serialize the request to JSON
+            var requestJson = System.Text.Json.JsonSerializer.Serialize(request);
+
+            // Send the trade request via TCP to the target instance
+            var result = await SendTcpCommandAsync(targetPort.Value, $"SUBMIT_TRADE:{requestJson}");
+
+            LogUtil.LogInfo($"TCP Response from instance: {result}", "TradeHubService");
+
+            if (result.StartsWith("ERROR"))
+            {
+                response.Status = TradeStatus.Failed;
+                response.ErrorMessage = result;
+                return response;
+            }
+
+            // Parse the JSON response from the slave instance
+            try
+            {
+                var slaveResponse = System.Text.Json.JsonSerializer.Deserialize<TradeResponse>(result);
+                if (slaveResponse != null)
+                {
+                    // Copy relevant data from slave response
+                    response.Status = slaveResponse.Status;
+                    response.ErrorMessage = slaveResponse.ErrorMessage;
+                    response.QueuePosition = slaveResponse.QueuePosition;
+                    response.EstimatedWaitMinutes = slaveResponse.EstimatedWaitMinutes;
+                    response.BotName = slaveResponse.BotName;
+
+                    if (slaveResponse.Messages != null)
+                    {
+                        response.Messages.AddRange(slaveResponse.Messages);
+                    }
+
+                    LogUtil.LogInfo($"Trade routed successfully to {request.Game} bot. Status: {response.Status}", "TradeHubService");
+                }
+                else
+                {
+                    response.Messages.Add($"Trade routed to {request.Game} bot instance");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogUtil.LogError($"Failed to parse slave response: {ex.Message}", "TradeHubService");
+                response.Messages.Add($"Trade routed to {request.Game} bot instance (response parse failed)");
+            }
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to route trade: {ex.Message}", "TradeHubService");
+            response.Status = TradeStatus.Failed;
+            response.ErrorMessage = $"Failed to route trade: {ex.Message}";
+            return response;
+        }
+    }
+
+    /// <summary>
+    /// Gets all running bot instances with their ports and game modes
+    /// </summary>
+    private static List<(int Port, string Mode)> GetAllBotInstances()
+    {
+        var instances = new List<(int, string)>();
+
+        try
+        {
+            var portFiles = System.IO.Directory.GetFiles(
+                System.AppContext.BaseDirectory,
+                "ZE_FusionBot_*.port"
+            );
+
+            foreach (var portFile in portFiles)
+            {
+                try
+                {
+                    var portText = System.IO.File.ReadAllText(portFile).Trim();
+                    if (int.TryParse(portText, out int port))
+                    {
+                        // Query the instance for its INFO
+                        var infoJson = QueryRemoteTcp(port, "INFO");
+                        if (!string.IsNullOrEmpty(infoJson) && !infoJson.StartsWith("ERROR"))
+                        {
+                            // Parse the JSON to get the Mode
+                            var info = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(infoJson);
+                            if (info.TryGetProperty("Mode", out var modeElement))
+                            {
+                                var mode = modeElement.GetString() ?? "Unknown";
+                                instances.Add((port, mode));
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogUtil.LogError($"Failed to query instance from file {portFile}: {ex.Message}", "TradeHubService");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to get bot instances: {ex.Message}", "TradeHubService");
+        }
+
+        return instances;
+    }
+
+    /// <summary>
+    /// Sends a TCP command to a remote instance
+    /// </summary>
+    private static string QueryRemoteTcp(int port, string command)
+    {
+        try
+        {
+            using var client = new System.Net.Sockets.TcpClient();
+            client.Connect("127.0.0.1", port);
+
+            using var stream = client.GetStream();
+            using var writer = new System.IO.StreamWriter(stream, System.Text.Encoding.UTF8) { AutoFlush = true };
+            using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8);
+
+            writer.WriteLine(command);
+            return reader.ReadLine() ?? "";
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to query remote TCP on port {port}: {ex.Message}", "TradeHubService");
+            return $"ERROR: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Sends a TCP command asynchronously
+    /// </summary>
+    private static async Task<string> SendTcpCommandAsync(int port, string command)
+    {
+        try
+        {
+            using var client = new System.Net.Sockets.TcpClient();
+            await client.ConnectAsync("127.0.0.1", port);
+
+            using var stream = client.GetStream();
+            using var writer = new System.IO.StreamWriter(stream, System.Text.Encoding.UTF8) { AutoFlush = true };
+            using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8);
+
+            await writer.WriteLineAsync(command);
+            return await reader.ReadLineAsync() ?? "";
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to send TCP command to port {port}: {ex.Message}", "TradeHubService");
+            return $"ERROR: {ex.Message}";
+        }
     }
 }

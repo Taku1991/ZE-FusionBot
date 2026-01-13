@@ -539,6 +539,7 @@ public static class WebApiExtensions
             "RESTARTSCHEDULE" => GetRestartSchedule(),
             "REMOTE_BUTTON" => HandleRemoteButton(parts),
             "REMOTE_MACRO" => HandleRemoteMacro(parts),
+            "SUBMIT_TRADE" => HandleSubmitTrade(command),
             _ => $"ERROR: Unknown command '{cmd}'"
         };
     }
@@ -897,6 +898,41 @@ public static class WebApiExtensions
             "MINUS" => SwitchButton.MINUS,
             _ => null
         };
+    }
+
+    private static string HandleSubmitTrade(string command)
+    {
+        try
+        {
+            // Extract JSON payload: SUBMIT_TRADE:{JSON}
+            var colonIndex = command.IndexOf(':');
+            if (colonIndex == -1 || colonIndex == command.Length - 1)
+                return "ERROR: Invalid SUBMIT_TRADE format. Expected SUBMIT_TRADE:{JSON}";
+
+            var json = command.Substring(colonIndex + 1);
+
+            LogUtil.LogInfo($"Received SUBMIT_TRADE command, processing trade locally", "WebApiExtensions");
+
+            // Deserialize the request
+            var request = System.Text.Json.JsonSerializer.Deserialize<SysBot.Pokemon.WinForms.API.Models.TradeRequest>(json);
+            if (request == null)
+                return "ERROR: Failed to deserialize TradeRequest";
+
+            // Process the trade using TradeHubService
+            var response = SysBot.Pokemon.WinForms.API.Services.TradeHubService.ProcessTradeDirectlyAsync(request).Result;
+
+            // Serialize the response back as JSON
+            var responseJson = System.Text.Json.JsonSerializer.Serialize(response);
+
+            LogUtil.LogInfo($"Trade processed: {response.Status}", "WebApiExtensions");
+
+            return responseJson;
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to handle SUBMIT_TRADE: {ex.Message}\n{ex.StackTrace}", "WebApiExtensions");
+            return $"ERROR: {ex.Message}";
+        }
     }
 
     private static List<BotController> GetBotControllers()
