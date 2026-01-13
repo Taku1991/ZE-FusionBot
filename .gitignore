@@ -359,6 +359,8 @@ PokeBot/
 
 # Claude
 .claude/
+temp
+tmpclaude*
 
 # Test Files
 /Test_Releaese/
@@ -368,3 +370,6 @@ Anleitung.md
 # Configuration files with sensitive data
 **/appsettings.json
 !**/appsettings.example.json
+config.json
+!config.example.json
+*/API/README.md
