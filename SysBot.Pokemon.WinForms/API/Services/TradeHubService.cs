@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR;
+using SysBot.Base;
 using SysBot.Pokemon;
 using SysBot.Pokemon.WinForms.API.Models;
 using SysBot.Pokemon.WinForms.API.Hubs;
@@ -198,6 +199,9 @@ public class TradeHubService
         {
             try
             {
+                LogUtil.LogInfo($"Attempting to create Pokemon from set for game {game}", "TradeHubService");
+                LogUtil.LogInfo($"Showdown set: {showdownSet}", "TradeHubService");
+
                 // Normalize the showdown set - handle both single-line and multi-line formats
                 ShowdownSet? set = null;
 
@@ -205,22 +209,34 @@ public class TradeHubService
                 try
                 {
                     set = new ShowdownSet(showdownSet);
+                    LogUtil.LogInfo($"Successfully parsed showdown set: Species={set.Species}, Ability={set.Ability}", "TradeHubService");
                 }
-                catch
+                catch (Exception ex)
                 {
+                    LogUtil.LogInfo($"Failed to parse as multi-line, trying single-line format. Error: {ex.Message}", "TradeHubService");
                     // If that fails, try to convert from single-line format (common from web forms)
-                    set = ShowdownUtil.ConvertToShowdown(showdownSet);
+                    try
+                    {
+                        set = ShowdownUtil.ConvertToShowdown(showdownSet);
+                        LogUtil.LogInfo($"Successfully converted to showdown set: Species={set?.Species}", "TradeHubService");
+                    }
+                    catch (Exception ex2)
+                    {
+                        LogUtil.LogError($"Failed to convert showdown set: {ex2.Message}", "TradeHubService");
+                        return null;
+                    }
                 }
 
                 if (set == null || set.Species == 0)
                 {
+                    LogUtil.LogError($"Invalid showdown set: set is null or species is 0", "TradeHubService");
                     return null;
                 }
 
-                var template = AutoLegalityWrapper.GetTemplate(set);
+                // Get the correct trainer for the game version
+                var generation = GetGeneration(game);
+                var sav = AutoLegalityWrapper.GetTrainerInfo((byte)generation);
 
-                // Create trainer info from preferences or use fallback
-                var sav = AutoLegalityWrapper.GetFallbackTrainer();
                 if (preferences != null && !string.IsNullOrEmpty(preferences.OriginalTrainerName))
                 {
                     sav = new SimpleTrainerInfo
@@ -229,23 +245,29 @@ public class TradeHubService
                         TID16 = (ushort)(preferences.TrainerID ?? 12345),
                         SID16 = (ushort)(preferences.SecretID ?? 54321),
                         Language = ParseLanguage(preferences.Language),
-                        Generation = (byte)GetGeneration(game)
+                        Generation = (byte)generation
                     };
                 }
 
+                var template = AutoLegalityWrapper.GetTemplate(set);
+                LogUtil.LogInfo($"Generated template for {set.Species} (Generation {generation})", "TradeHubService");
+
                 // Generate legal Pokemon
+                LogUtil.LogInfo($"Calling GetLegal for {set.Species}", "TradeHubService");
                 var pkm = sav.GetLegal(template, out var result);
 
-                if (result != "Regenerated")
+                if (pkm == null)
                 {
-                    // Log the legality result but still return the Pokemon
-                    // The bot will handle final legality checks
+                    LogUtil.LogError($"GetLegal returned null. Result: {result}", "TradeHubService");
+                    return null;
                 }
 
+                LogUtil.LogInfo($"Successfully created Pokemon: {pkm.Species} (Result: {result})", "TradeHubService");
                 return pkm;
             }
-            catch
+            catch (Exception ex)
             {
+                LogUtil.LogError($"Exception in CreatePokemonFromSetAsync: {ex.Message}\n{ex.StackTrace}", "TradeHubService");
                 return null;
             }
         });
@@ -253,17 +275,27 @@ public class TradeHubService
 
     private dynamic CreateTradeDetail(PKM pkm, TradeRequest request, int tradeCode, TradeResponse response, string tradeId)
     {
-        var uniqueTradeID = Interlocked.Increment(ref _uniqueTradeCounter);
-
-        // Create trainer info
+        var uniqueTradeID = (int)Interlocked.Increment(ref _uniqueTradeCounter);
         var trainerInfo = new PokeTradeTrainerInfo(request.TrainerName, ulong.Parse(request.UserId));
 
-        // Create SignalR notifier
-        var notifier = new SignalRTradeNotifier<PK9>(_hubContext, tradeId, response);
+        // Create trade detail based on game type
+        return request.Game.ToUpperInvariant() switch
+        {
+            "SV" => CreateTradeDetailTyped((PK9)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID),
+            "PLZA" => CreateTradeDetailTyped((PA9)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID),
+            "SWSH" => CreateTradeDetailTyped((PK8)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID),
+            "BDSP" => CreateTradeDetailTyped((PB8)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID),
+            "PLA" => CreateTradeDetailTyped((PA8)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID),
+            "LGPE" => CreateTradeDetailTyped((PB7)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID),
+            _ => throw new NotSupportedException($"Game {request.Game} is not supported")
+        };
+    }
 
-        // Create trade detail - using dynamic to handle different PKM types
-        return new PokeTradeDetail<PK9>(
-            (PK9)pkm,
+    private PokeTradeDetail<T> CreateTradeDetailTyped<T>(T pkm, PokeTradeTrainerInfo trainerInfo, int tradeCode, TradeResponse response, string tradeId, int uniqueTradeID) where T : PKM, new()
+    {
+        var notifier = new SignalRTradeNotifier<T>(_hubContext, tradeId, response);
+        return new PokeTradeDetail<T>(
+            pkm,
             trainerInfo,
             notifier,
             PokeTradeType.Specific,
