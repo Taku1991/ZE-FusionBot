@@ -12,6 +12,7 @@ using System.Diagnostics;
 using SysBot.Pokemon.Helpers;
 using System.Reflection;
 using SysBot.Pokemon.WinForms.WebApi;
+using SysBot.Pokemon.WinForms.API;
 using static SysBot.Pokemon.WinForms.WebApi.RestartManager;
 using System.Collections.Concurrent;
 
@@ -24,6 +25,7 @@ public static class WebApiExtensions
     private static CancellationTokenSource? _cts;
     private static CancellationTokenSource? _monitorCts;
     private static Main? _main;
+    private static ApiHost? _apiHost;
 
     private static int _webPort = 8080; // Will be set from config
     private static int _tcpPort = 0;
@@ -140,10 +142,44 @@ public static class WebApiExtensions
                     }
                 }
             });
+
+            // Start REST API with SignalR if enabled
+            StartRestAPI();
         }
         catch (Exception ex)
         {
             LogUtil.LogError("WebServer", $"Failed to initialize web server: {ex.Message}");
+        }
+    }
+
+    private static void StartRestAPI()
+    {
+        try
+        {
+            // Check if REST API is enabled
+            if (Main.Config?.Hub?.WebServer == null || !Main.Config.Hub.WebServer.EnableRestAPI)
+            {
+                LogUtil.LogInfo("REST API is disabled in settings.", "ApiHost");
+                return;
+            }
+
+            var apiPort = Main.Config.Hub.WebServer.RestAPIPort;
+            var corsOrigins = Main.Config.Hub.WebServer.CorsOrigins;
+
+            // Parse CORS origins
+            var origins = string.IsNullOrWhiteSpace(corsOrigins)
+                ? new[] { "http://localhost:3000" } // Default to localhost if empty
+                : corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(o => o.Trim())
+                    .ToArray();
+
+            // Start the API host
+            _apiHost = new ApiHost(apiPort, origins);
+            _apiHost.Start();
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to start REST API: {ex.Message}", "ApiHost");
         }
     }
 
@@ -1088,6 +1124,7 @@ public static class WebApiExtensions
             _cts?.Cancel();
             _tcp?.Stop();
             _server?.Dispose();
+            _apiHost?.Dispose();
             RestartManager.Shutdown();
 
             // Release the port reservations
