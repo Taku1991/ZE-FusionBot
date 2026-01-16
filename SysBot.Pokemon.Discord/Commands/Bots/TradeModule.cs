@@ -767,15 +767,19 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
 
                 await processingMessage.DeleteAsync();
 
+                var batchTradeCode = Info.GetRandomTradeCode(userId);
+
                 if (errors.Count > 0)
                 {
                     await BatchHelpers<T>.SendBatchErrorEmbedAsync(Context, errors, selections.Count);
+
+                    // Log full batch trade error details to configured channels
+                    await Helpers<T>.SendFullBatchTradeErrorLogAsync(Context, errors, batchTradeCode, selections.Count);
                     return;
                 }
 
                 if (batchPokemonList.Count > 0)
                 {
-                    var batchTradeCode = Info.GetRandomTradeCode(userId);
                     await BatchHelpers<T>.ProcessBatchContainer(Context, batchPokemonList, batchTradeCode, selections.Count);
                 }
             }
@@ -1011,14 +1015,18 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
 
                 await processingMessage.DeleteAsync();
 
+                var batchTradeCode = Info.GetRandomTradeCode(userID);
+
                 if (errors.Count > 0)
                 {
                     await BatchHelpers<T>.SendBatchErrorEmbedAsync(Context, errors, trades.Count);
+
+                    // Log full batch trade error details to configured channels
+                    await Helpers<T>.SendFullBatchTradeErrorLogAsync(Context, errors, batchTradeCode, trades.Count);
                     return;
                 }
                 if (batchPokemonList.Count > 0)
                 {
-                    var batchTradeCode = Info.GetRandomTradeCode(userID);
                     await BatchHelpers<T>.ProcessBatchContainer(Context, batchPokemonList, batchTradeCode, trades.Count);
                 }
             }
@@ -1212,6 +1220,8 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                 ? tradeConfig.MaxPkmsPerTrade
                 : 4;
 
+            var tradeCode = Info.GetRandomTradeCode(userID);
+
             if (batchPokemonList.Count > maxAllowed)
             {
                 await Context.Channel.SendMessageAsync(
@@ -1223,6 +1233,9 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
             if (errors.Count > 0)
             {
                 await BatchHelpers<T>.SendBatchErrorEmbedAsync(Context, errors, pkmFiles.Count);
+
+                // Log full batch trade error details to configured channels
+                await Helpers<T>.SendFullBatchTradeErrorLogAsync(Context, errors, tradeCode, pkmFiles.Count);
                 return;
             }
 
@@ -1234,7 +1247,6 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                 return;
             }
 
-            var tradeCode = Info.GetRandomTradeCode(userID);
             await BatchHelpers<T>.ProcessBatchContainer(
                 Context,
                 batchPokemonList,
@@ -1430,6 +1442,9 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                     LogUtil.LogInfo(nameof(TradeModule<T>),
                         $"Showdown set failed: error='{processed.Error ?? "null"}', hint='{processed.LegalizationHint ?? "none"}', species={processed.ShowdownSet?.Species}");
                     await Helpers<T>.SendTradeErrorEmbedAsync(Context, processed);
+
+                    // Log full trade error details to configured channels
+                    await Helpers<T>.SendFullTradeErrorLogAsync(Context, processed.Error ?? "Unknown error", content, code, processed.LegalizationHint);
                     return;
                 }
 
@@ -1568,6 +1583,9 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
                     $"An unexpected problem happened with this Showdown Set.\n" +
                     $"Try `{Prefix}convert` instead, or remove some information.",
                     8);
+
+                // Log full trade error details to configured channels
+                await Helpers<T>.SendFullTradeErrorLogAsync(Context, $"Exception: {ex.Message}", content, code);
             }
         });
 
