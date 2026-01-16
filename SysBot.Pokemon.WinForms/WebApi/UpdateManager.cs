@@ -633,8 +633,9 @@ public static class UpdateManager
                                             {
                                                 try
                                                 {
+                                                    // Always use Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports") for port files so all instances can see them
                                                     var portFile = Path.Combine(
-                                                        Path.GetDirectoryName(proc.MainModule?.FileName ?? "") ?? "",
+                                                        Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports"),
                                                         $"ZE_FusionBot_{proc.Id}.port"
                                                     );
 
@@ -705,8 +706,9 @@ public static class UpdateManager
                     if (sanitizedPath == null)
                         continue;
 
+                    // Always use Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports") for port files so all instances can see them
                     var portFile = Path.Combine(
-                        Path.GetDirectoryName(sanitizedPath) ?? "",
+                        Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports"),
                         $"ZE_FusionBot_{process.Id}.port"
                     );
 
@@ -1475,7 +1477,8 @@ public static class UpdateManager
         // Try to read from port file
         try
         {
-            var baseDir = Path.GetDirectoryName(Application.ExecutablePath) ?? "";
+            // Always use Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports") for port files so all instances can see them
+            var baseDir = Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports");
             var portFile = Path.Combine(baseDir, $"ZE_FusionBot_{Environment.ProcessId}.port");
 
             var safePortFile = ValidateAndSanitizePath(portFile);

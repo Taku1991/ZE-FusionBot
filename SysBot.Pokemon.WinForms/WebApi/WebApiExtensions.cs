@@ -37,6 +37,16 @@ public static class WebApiExtensions
     /// </summary>
     public static Main? GetMainForm() => _main;
 
+    /// <summary>
+    /// Get the current TCP port for this bot instance
+    /// </summary>
+    public static int GetCurrentTcpPort() => _tcpPort;
+
+    /// <summary>
+    /// Check if this bot instance is running the REST API server (Master)
+    /// </summary>
+    public static bool HasRestApiServer() => _apiHost != null;
+
     public static void InitWebServer(this Main mainForm)
     {
         _main = mainForm;
@@ -200,8 +210,8 @@ public static class WebApiExtensions
     {
         try
         {
-            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-            var exeDir = Path.GetDirectoryName(exePath) ?? Program.WorkingDirectory;
+            // Use shared directory so all bot instances can discover each other
+            var portDir = GetSharedPortDirectory();
 
             // Also clean up stale port reservations (older than 5 minutes)
             var now = DateTime.Now;
@@ -215,7 +225,7 @@ public static class WebApiExtensions
                 _portReservations.TryRemove(port, out _);
             }
 
-            var portFiles = Directory.GetFiles(exeDir, "ZE_FusionBot_*.port");
+            var portFiles = Directory.GetFiles(portDir, "ZE_FusionBot_*.port");
 
             foreach (var portFile in portFiles)
             {
@@ -904,14 +914,21 @@ public static class WebApiExtensions
     {
         try
         {
+            LogUtil.LogInfo($"========== HandleSubmitTrade called via TCP ==========", "WebApiExtensions");
+            LogUtil.LogInfo($"Command length: {command.Length} chars", "WebApiExtensions");
+
             // Extract JSON payload: SUBMIT_TRADE:{JSON}
             var colonIndex = command.IndexOf(':');
             if (colonIndex == -1 || colonIndex == command.Length - 1)
+            {
+                LogUtil.LogError($"Invalid SUBMIT_TRADE format", "WebApiExtensions");
                 return "ERROR: Invalid SUBMIT_TRADE format. Expected SUBMIT_TRADE:{JSON}";
+            }
 
             var json = command.Substring(colonIndex + 1);
+            LogUtil.LogInfo($"Extracted JSON payload ({json.Length} chars)", "WebApiExtensions");
 
-            LogUtil.LogInfo($"Received SUBMIT_TRADE command, processing trade locally", "WebApiExtensions");
+            LogUtil.LogInfo($"🔄 Received SUBMIT_TRADE command, processing trade locally", "WebApiExtensions");
 
             // Deserialize the request
             var request = System.Text.Json.JsonSerializer.Deserialize<SysBot.Pokemon.WinForms.API.Models.TradeRequest>(json);
@@ -1032,13 +1049,31 @@ public static class WebApiExtensions
         };
     }
 
+    /// <summary>
+    /// Gets the shared directory for port files that all bot instances can access
+    /// </summary>
+    private static string GetSharedPortDirectory()
+    {
+        // Use a common temp directory that all bot instances can access
+        // regardless of which folder they're running from
+        var sharedDir = Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports");
+
+        // Ensure directory exists
+        if (!Directory.Exists(sharedDir))
+        {
+            Directory.CreateDirectory(sharedDir);
+        }
+
+        return sharedDir;
+    }
+
     private static void CreatePortFile()
     {
         try
         {
-            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-            var exeDir = Path.GetDirectoryName(exePath) ?? Program.WorkingDirectory;
-            var portFile = Path.Combine(exeDir, $"ZE_FusionBot_{Environment.ProcessId}.port");
+            // Use shared directory so all bot instances can discover each other
+            var portDir = GetSharedPortDirectory();
+            var portFile = Path.Combine(portDir, $"ZE_FusionBot_{Environment.ProcessId}.port");
             var tempFile = portFile + ".tmp";
 
             using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
@@ -1062,9 +1097,9 @@ public static class WebApiExtensions
     {
         try
         {
-            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-            var exeDir = Path.GetDirectoryName(exePath) ?? Program.WorkingDirectory;
-            var portFile = Path.Combine(exeDir, $"ZE_FusionBot_{Environment.ProcessId}.port");
+            // Use shared directory so all bot instances can discover each other
+            var portDir = GetSharedPortDirectory();
+            var portFile = Path.Combine(portDir, $"ZE_FusionBot_{Environment.ProcessId}.port");
 
             if (File.Exists(portFile))
                 File.Delete(portFile);
@@ -1077,8 +1112,8 @@ public static class WebApiExtensions
 
     private static int FindAvailablePort(int startPort)
     {
-        var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-        var exeDir = Path.GetDirectoryName(exePath) ?? Program.WorkingDirectory;
+        // Use shared directory so all bot instances can discover each other
+        var portDir = GetSharedPortDirectory();
 
         // Use a lock to prevent race conditions
         lock (_portLock)
@@ -1092,7 +1127,7 @@ public static class WebApiExtensions
                 if (!IsPortInUse(port))
                 {
                     // Check if any port file claims this port
-                    var portFiles = Directory.GetFiles(exeDir, "ZE_FusionBot_*.port");
+                    var portFiles = Directory.GetFiles(portDir, "ZE_FusionBot_*.port");
                     bool portClaimed = false;
 
                     foreach (var file in portFiles)
@@ -1280,7 +1315,8 @@ public static class WebApiExtensions
                     if (string.IsNullOrEmpty(exePath))
                         continue;
 
-                    var portFile = Path.Combine(Path.GetDirectoryName(exePath)!, $"ZE_FusionBot_{process.Id}.port");
+                    // Use shared directory so all bot instances can discover each other
+                    var portFile = Path.Combine(GetSharedPortDirectory(), $"ZE_FusionBot_{process.Id}.port");
                     if (!File.Exists(portFile))
                         continue;
 

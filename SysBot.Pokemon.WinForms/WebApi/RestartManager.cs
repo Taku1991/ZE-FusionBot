@@ -433,7 +433,8 @@ public static class RestartManager
             if (string.IsNullOrEmpty(exePath))
                 return null;
 
-            var portFile = Path.Combine(Path.GetDirectoryName(exePath)!, $"ZE_FusionBot_{process.Id}.port");
+            // Always use Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports") for port files so all instances can see them
+            var portFile = Path.Combine(Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports"), $"ZE_FusionBot_{process.Id}.port");
             if (!File.Exists(portFile))
                 return null;
 
@@ -959,7 +960,8 @@ public static class RestartManager
                     if (string.IsNullOrEmpty(exePath))
                         continue;
 
-                    var portFile = Path.Combine(Path.GetDirectoryName(exePath)!, $"ZE_FusionBot_{process.Id}.port");
+                    // Always use Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports") for port files so all instances can see them
+                    var portFile = Path.Combine(Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports"), $"ZE_FusionBot_{process.Id}.port");
                     if (!File.Exists(portFile))
                         continue;
 
