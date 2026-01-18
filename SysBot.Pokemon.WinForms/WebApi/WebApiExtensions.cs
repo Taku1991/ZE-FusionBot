@@ -550,6 +550,7 @@ public static class WebApiExtensions
             "REMOTE_BUTTON" => HandleRemoteButton(parts),
             "REMOTE_MACRO" => HandleRemoteMacro(parts),
             "SUBMIT_TRADE" => HandleSubmitTrade(command),
+            "GET_STATUS" => HandleGetStatus(command),
             _ => $"ERROR: Unknown command '{cmd}'"
         };
     }
@@ -914,9 +915,6 @@ public static class WebApiExtensions
     {
         try
         {
-            LogUtil.LogInfo($"========== HandleSubmitTrade called via TCP ==========", "WebApiExtensions");
-            LogUtil.LogInfo($"Command length: {command.Length} chars", "WebApiExtensions");
-
             // Extract JSON payload: SUBMIT_TRADE:{JSON}
             var colonIndex = command.IndexOf(':');
             if (colonIndex == -1 || colonIndex == command.Length - 1)
@@ -926,9 +924,6 @@ public static class WebApiExtensions
             }
 
             var json = command.Substring(colonIndex + 1);
-            LogUtil.LogInfo($"Extracted JSON payload ({json.Length} chars)", "WebApiExtensions");
-
-            LogUtil.LogInfo($"🔄 Received SUBMIT_TRADE command, processing trade locally", "WebApiExtensions");
 
             // Deserialize the request
             var request = System.Text.Json.JsonSerializer.Deserialize<SysBot.Pokemon.WinForms.API.Models.TradeRequest>(json);
@@ -941,13 +936,51 @@ public static class WebApiExtensions
             // Serialize the response back as JSON
             var responseJson = System.Text.Json.JsonSerializer.Serialize(response);
 
-            LogUtil.LogInfo($"Trade processed: {response.Status}", "WebApiExtensions");
-
             return responseJson;
         }
         catch (Exception ex)
         {
             LogUtil.LogError($"Failed to handle SUBMIT_TRADE: {ex.Message}\n{ex.StackTrace}", "WebApiExtensions");
+            return $"ERROR: {ex.Message}";
+        }
+    }
+
+    private static string HandleGetStatus(string command)
+    {
+        try
+        {
+            LogUtil.LogInfo($"========== HandleGetStatus called via TCP ==========", "WebApiExtensions");
+
+            // Extract TradeId: GET_STATUS:{tradeId}
+            var colonIndex = command.IndexOf(':');
+            if (colonIndex == -1 || colonIndex == command.Length - 1)
+            {
+                LogUtil.LogError($"Invalid GET_STATUS format", "WebApiExtensions");
+                return "ERROR: Invalid GET_STATUS format. Expected GET_STATUS:{tradeId}";
+            }
+
+            var tradeId = command.Substring(colonIndex + 1);
+            LogUtil.LogInfo($"Querying status for TradeId: {tradeId}", "WebApiExtensions");
+
+            // Get status using TradeHubService
+            var status = SysBot.Pokemon.WinForms.API.Services.TradeHubService.GetTradeStatusDirectlyAsync(tradeId).Result;
+
+            if (status == null)
+            {
+                LogUtil.LogInfo($"Trade not found: {tradeId}", "WebApiExtensions");
+                return "ERROR: Trade not found";
+            }
+
+            // Serialize the response back as JSON
+            var responseJson = System.Text.Json.JsonSerializer.Serialize(status);
+
+            LogUtil.LogInfo($"Status returned: {status.Status}", "WebApiExtensions");
+
+            return responseJson;
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to handle GET_STATUS: {ex.Message}\n{ex.StackTrace}", "WebApiExtensions");
             return $"ERROR: {ex.Message}";
         }
     }

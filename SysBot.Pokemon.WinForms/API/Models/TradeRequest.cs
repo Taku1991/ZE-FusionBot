@@ -5,6 +5,11 @@ namespace SysBot.Pokemon.WinForms.API.Models;
 public class TradeRequest
 {
     /// <summary>
+    /// Trade ID - set by Master when routing to slaves
+    /// </summary>
+    public string? TradeId { get; set; }
+
+    /// <summary>
     /// User ID from Next.js authentication
     /// </summary>
     public required string UserId { get; set; }
@@ -38,6 +43,13 @@ public class TradeRequest
     /// Optional custom trade code (8 digits)
     /// </summary>
     public string? TradeCode { get; set; }
+
+    /// <summary>
+    /// LGPE Trade Code (3 Pokemon icons)
+    /// Can be: "Pikachu,Eevee,Bulbasaur" or ["Pikachu", "Eevee", "Bulbasaur"]
+    /// Valid values: Pikachu, Eevee, Bulbasaur, Charmander, Squirtle, Pidgey, Caterpie, Rattata, Jigglypuff, Diglett
+    /// </summary>
+    public string? LgpeTradeCode { get; set; }
 
     /// <summary>
     /// Trainer preferences for ID, OT, etc.

@@ -157,7 +157,7 @@ internal class CustomLogger : ILogger
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
-    public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Warning;
+    public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
@@ -174,12 +174,6 @@ internal class CustomLogger : ILogger
                 LogUtil.LogError($"{message}", category);
                 if (exception != null)
                     LogUtil.LogError($"{exception}", category);
-                break;
-            case LogLevel.Warning:
-                LogUtil.LogInfo($"⚠️ {message}", category);
-                break;
-            case LogLevel.Information:
-                LogUtil.LogInfo(message, category);
                 break;
         }
     }

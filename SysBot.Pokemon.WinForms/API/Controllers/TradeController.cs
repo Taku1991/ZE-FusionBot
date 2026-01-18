@@ -30,9 +30,6 @@ public class TradeController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Trade submission received from user {UserId} for {Game}",
-                request.UserId, request.Game);
-
             // Validate request
             if (string.IsNullOrWhiteSpace(request.ShowdownSet))
             {
@@ -70,13 +67,8 @@ public class TradeController : ControllerBase
 
             if (response.Status == TradeStatus.Failed)
             {
-                _logger.LogWarning("Trade submission failed for user {UserId}: {Error}",
-                    request.UserId, response.ErrorMessage);
                 return BadRequest(response);
             }
-
-            _logger.LogInformation("Trade {TradeId} submitted successfully for user {UserId}",
-                response.TradeId, request.UserId);
 
             return Ok(response);
         }
@@ -105,9 +97,6 @@ public class TradeController : ControllerBase
                 return BadRequest(new { error = "Maximum 6 Pokemon per batch trade" });
             }
 
-            _logger.LogInformation("Batch trade submission received from user {UserId} with {Count} Pokemon",
-                request.UserId, request.BatchShowdownSets.Count);
-
             var responses = new List<TradeResponse>();
 
             foreach (var showdownSet in request.BatchShowdownSets)
@@ -130,8 +119,6 @@ public class TradeController : ControllerBase
                 // If one fails, stop the batch
                 if (response.Status == TradeStatus.Failed)
                 {
-                    _logger.LogWarning("Batch trade failed at Pokemon {Index} for user {UserId}",
-                        responses.Count, request.UserId);
                     break;
                 }
 
@@ -162,7 +149,6 @@ public class TradeController : ControllerBase
                 return NotFound(new { error = "Trade not found or cannot be cancelled" });
             }
 
-            _logger.LogInformation("Trade {TradeId} cancelled by user {UserId}", tradeId, request.UserId);
             return Ok(new { message = "Trade cancelled successfully" });
         }
         catch (Exception ex)

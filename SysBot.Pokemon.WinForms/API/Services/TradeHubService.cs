@@ -20,8 +20,14 @@ namespace SysBot.Pokemon.WinForms.API.Services;
 public class TradeHubService
 {
     private readonly IHubContext<TradeStatusHub> _hubContext;
-    private readonly ConcurrentDictionary<string, TradeResponse> _activeTrades = new();
+
+    // Make _activeTrades static so it can be accessed from TCP handler
+    private static readonly ConcurrentDictionary<string, TradeResponse> _activeTrades = new();
     private static int _uniqueTradeCounter = 0;
+
+    // Static mapping: TradeId → Slave Port
+    // Master uses this to route status queries to the correct slave
+    private static readonly ConcurrentDictionary<string, int> _tradeIdToSlavePort = new();
 
     public TradeHubService(IHubContext<TradeStatusHub> hubContext)
     {
@@ -39,11 +45,25 @@ public class TradeHubService
     }
 
     /// <summary>
+    /// Static method to get trade status directly (called from TCP handler)
+    /// </summary>
+    public static async Task<TradeResponse?> GetTradeStatusDirectlyAsync(string tradeId)
+    {
+        await Task.CompletedTask;
+        return _activeTrades.TryGetValue(tradeId, out var trade) ? trade : null;
+    }
+
+    /// <summary>
     /// Submits a trade request to the bot system
     /// </summary>
     public async Task<TradeResponse> SubmitTradeAsync(TradeRequest request)
     {
-        var tradeId = Guid.NewGuid().ToString();
+        // Use the TradeId from the request if provided (routed from Master)
+        // Otherwise create a new one (direct submission)
+        var tradeId = !string.IsNullOrEmpty(request.TradeId)
+            ? request.TradeId
+            : Guid.NewGuid().ToString();
+
         var tradeCode = ParseTradeCode(request.TradeCode);
 
         var response = new TradeResponse
@@ -60,27 +80,36 @@ public class TradeHubService
 
         try
         {
-            // Log the entry point
-            LogUtil.LogInfo($"========== SubmitTradeAsync called for game={request.Game}, trainer={request.TrainerName} ==========", "TradeHubService");
-
             // Check if this is the Master instance (port 8080)
             // Master routes trades to the correct bot instance
             bool isMaster = IsMasterInstance();
-            LogUtil.LogInfo($"IsMasterInstance={isMaster}, Mode={Main.Config?.Mode}", "TradeHubService");
 
             if (isMaster)
             {
-                LogUtil.LogInfo($"✈️ Master instance: Routing {request.Game} trade to correct bot instance", "TradeHubService");
+                // Master: Check if this trade is for our own game mode
+                var config = Main.Config;
+                if (config != null)
+                {
+                    var normalizedRequestGame = NormalizeGameName(request.Game);
+                    var normalizedOwnMode = NormalizeGameName(config.Mode.ToString());
+
+                    if (normalizedRequestGame.Equals(normalizedOwnMode, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // This is for our game, process locally
+                        var result = await EnqueueTradeWithCorrectType(request, tradeCode, tradeId, response);
+                        return result;
+                    }
+                }
+
+                // Different game, route to appropriate slave
                 return await RouteTradeToInstance(request, response);
             }
 
             // Slave instance: Process trade locally
-            LogUtil.LogInfo($"🤖 Slave instance: Processing {request.Game} trade locally", "TradeHubService");
-
             // Use reflection to call a typed method that handles the entire trade process
             // This ensures the Pokemon is created with the correct type for this bot instance
-            var result = await EnqueueTradeWithCorrectType(request, tradeCode, tradeId, response);
-            return result;
+            var slaveResult = await EnqueueTradeWithCorrectType(request, tradeCode, tradeId, response);
+            return slaveResult;
         }
         catch (Exception ex)
         {
@@ -96,7 +125,36 @@ public class TradeHubService
     /// </summary>
     public async Task<TradeResponse?> GetTradeStatusAsync(string tradeId)
     {
-        await Task.CompletedTask;
+        // Check if this trade was routed to a slave bot
+        if (_tradeIdToSlavePort.TryGetValue(tradeId, out var slavePort))
+        {
+            try
+            {
+                // Query the slave bot for the trade status via TCP
+                var result = await SendTcpCommandAsync(slavePort, $"GET_STATUS:{tradeId}");
+
+                if (!result.StartsWith("ERROR"))
+                {
+                    var slaveStatus = System.Text.Json.JsonSerializer.Deserialize<TradeResponse>(result);
+                    if (slaveStatus != null)
+                    {
+                        return slaveStatus;
+                    }
+                }
+
+                // Only log errors, not normal status queries
+                if (!result.Contains("Trade not found"))
+                {
+                    LogUtil.LogError($"Failed to get status from slave on port {slavePort}: {result}", "TradeHubService");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogUtil.LogError($"Error querying slave for status: {ex.Message}", "TradeHubService");
+            }
+        }
+
+        // Fallback: Check local trades (for non-routed trades or if slave query failed)
         return _activeTrades.TryGetValue(tradeId, out var trade) ? trade : null;
     }
 
@@ -292,7 +350,7 @@ public class TradeHubService
             "SWSH" => CreateTradeDetailTyped((PK8)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID),
             "BDSP" => CreateTradeDetailTyped((PB8)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID),
             "PLA" => CreateTradeDetailTyped((PA8)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID),
-            "LGPE" => CreateTradeDetailTyped((PB7)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID),
+            "LGPE" => CreateTradeDetailTypedLGPE((PB7)pkm, trainerInfo, tradeCode, response, tradeId, uniqueTradeID, request.LgpeTradeCode),
             _ => throw new NotSupportedException($"Game {request.Game} is not supported")
         };
     }
@@ -308,6 +366,58 @@ public class TradeHubService
             tradeCode,
             uniqueTradeID: uniqueTradeID
         );
+    }
+
+    private PokeTradeDetail<PB7> CreateTradeDetailTypedLGPE(PB7 pkm, PokeTradeTrainerInfo trainerInfo, int tradeCode, TradeResponse response, string tradeId, int uniqueTradeID, string? lgpeCodeString)
+    {
+        var notifier = new SignalRTradeNotifier<PB7>(_hubContext, tradeId, response);
+
+        // Parse LGPE trade code
+        List<Pictocodes>? lgpeCodes = null;
+        if (!string.IsNullOrEmpty(lgpeCodeString))
+        {
+            lgpeCodes = ParseLgpeTradeCode(lgpeCodeString);
+        }
+
+        return new PokeTradeDetail<PB7>(
+            pkm,
+            trainerInfo,
+            notifier,
+            PokeTradeType.Specific,
+            tradeCode,
+            lgcode: lgpeCodes,
+            uniqueTradeID: uniqueTradeID
+        );
+    }
+
+    private static List<Pictocodes> ParseLgpeTradeCode(string lgpeCodeString)
+    {
+        var codes = new List<Pictocodes>();
+
+        // Split by comma and trim
+        var parts = lgpeCodeString.Split(',');
+
+        foreach (var part in parts)
+        {
+            var trimmed = part.Trim();
+            if (Enum.TryParse<Pictocodes>(trimmed, true, out var code))
+            {
+                codes.Add(code);
+            }
+            else
+            {
+                LogUtil.LogError($"Invalid LGPE trade code: {trimmed}", "TradeHubService");
+            }
+        }
+
+        // Validate: Must have exactly 3 codes
+        if (codes.Count != 3)
+        {
+            LogUtil.LogError($"LGPE trade code must have exactly 3 Pokemon, got {codes.Count}. Using default: Pikachu,Pikachu,Pikachu", "TradeHubService");
+            return new List<Pictocodes> { Pictocodes.Pikachu, Pictocodes.Pikachu, Pictocodes.Pikachu };
+        }
+
+        return codes;
     }
 
     private static void EnqueueTrade(dynamic hub, dynamic tradeDetail)
@@ -446,11 +556,6 @@ public class TradeHubService
             // Slaves only have TCP listeners (no REST API)
 
             bool hasRestApi = WebApiExtensions.HasRestApiServer();
-            var config = Main.Config;
-            string mode = config?.Mode.ToString() ?? "Unknown";
-
-            LogUtil.LogInfo($"IsMasterInstance check: HasRestApi={hasRestApi}, Mode={mode}", "TradeHubService");
-
             return hasRestApi;
         }
         catch (Exception ex)
@@ -458,6 +563,24 @@ public class TradeHubService
             LogUtil.LogError($"IsMasterInstance check failed: {ex.Message}", "TradeHubService");
             return false;
         }
+    }
+
+    /// <summary>
+    /// Normalizes game names to match bot mode names
+    /// </summary>
+    private static string NormalizeGameName(string gameName)
+    {
+        return gameName.ToUpperInvariant() switch
+        {
+            "PLA" => "LA",    // Pokémon Legends: Arceus
+            "LA" => "LA",
+            "PLZA" => "PLZA", // Pokémon Legends: Z-A
+            "BDSP" => "BDSP", // Brilliant Diamond/Shining Pearl
+            "SWSH" => "SWSH", // Sword/Shield
+            "SV" => "SV",     // Scarlet/Violet
+            "LGPE" => "LGPE", // Let's Go Pikachu/Eevee
+            _ => gameName.ToUpperInvariant()
+        };
     }
 
     /// <summary>
@@ -470,15 +593,15 @@ public class TradeHubService
             // Find all running instances
             var instances = GetAllBotInstances();
 
-            LogUtil.LogInfo($"Found {instances.Count} bot instances", "TradeHubService");
+            // Normalize the game name (e.g., "PLA" → "LA")
+            string normalizedGame = NormalizeGameName(request.Game);
 
             // Find the instance that handles this game
             int? targetPort = null;
             foreach (var (port, mode) in instances)
             {
-                LogUtil.LogInfo($"Instance on port {port} handles game: {mode}", "TradeHubService");
-
-                if (mode.Equals(request.Game, StringComparison.OrdinalIgnoreCase))
+                string normalizedMode = NormalizeGameName(mode);
+                if (normalizedMode.Equals(normalizedGame, StringComparison.OrdinalIgnoreCase))
                 {
                     targetPort = port;
                     break;
@@ -493,17 +616,14 @@ public class TradeHubService
                 return response;
             }
 
-            LogUtil.LogInfo($"📡 Routing {request.Game} trade to instance on port {targetPort}", "TradeHubService");
+            // IMPORTANT: Set the TradeId in the request so the slave uses the same ID
+            request.TradeId = response.TradeId;
 
             // Serialize the request to JSON
             var requestJson = System.Text.Json.JsonSerializer.Serialize(request);
-            LogUtil.LogInfo($"Serialized request: {requestJson.Length} chars", "TradeHubService");
 
             // Send the trade request via TCP to the target instance
-            LogUtil.LogInfo($"Sending TCP command to 127.0.0.1:{targetPort.Value}", "TradeHubService");
             var result = await SendTcpCommandAsync(targetPort.Value, $"SUBMIT_TRADE:{requestJson}");
-
-            LogUtil.LogInfo($"✅ TCP Response from instance (length={result.Length}): {result.Substring(0, Math.Min(200, result.Length))}", "TradeHubService");
 
             if (result.StartsWith("ERROR"))
             {
@@ -530,7 +650,9 @@ public class TradeHubService
                         response.Messages.AddRange(slaveResponse.Messages);
                     }
 
-                    LogUtil.LogInfo($"Trade routed successfully to {request.Game} bot. Status: {response.Status}", "TradeHubService");
+                    // IMPORTANT: Remember which slave is handling this trade
+                    // So we can route status queries to the correct slave
+                    _tradeIdToSlavePort[response.TradeId] = targetPort.Value;
                 }
                 else
                 {
@@ -583,68 +705,52 @@ public class TradeHubService
         {
             // Use shared directory so all bot instances can discover each other
             var baseDir = GetSharedPortDirectory();
-            LogUtil.LogInfo($"🔍 Searching for bot instances in: {baseDir}", "TradeHubService");
-
             var portFiles = System.IO.Directory.GetFiles(baseDir, "ZE_FusionBot_*.port");
-            LogUtil.LogInfo($"📂 Found {portFiles.Length} port files", "TradeHubService");
 
             foreach (var portFile in portFiles)
             {
                 try
                 {
-                    LogUtil.LogInfo($"  📄 Reading port file: {System.IO.Path.GetFileName(portFile)}", "TradeHubService");
                     var portText = System.IO.File.ReadAllText(portFile).Trim();
-                    LogUtil.LogInfo($"     Port content: '{portText}'", "TradeHubService");
 
                     if (int.TryParse(portText, out int port))
                     {
-                        LogUtil.LogInfo($"     Querying TCP port {port} for INFO...", "TradeHubService");
-
                         // Query the instance for its INFO
                         var infoJson = QueryRemoteTcp(port, "INFO");
 
                         if (string.IsNullOrEmpty(infoJson))
                         {
-                            LogUtil.LogError($"     ❌ Empty response from port {port}", "TradeHubService");
+                            LogUtil.LogError($"Empty response from port {port}", "TradeHubService");
                             continue;
                         }
 
                         if (infoJson.StartsWith("ERROR"))
                         {
-                            LogUtil.LogError($"     ❌ Error response from port {port}: {infoJson}", "TradeHubService");
+                            LogUtil.LogError($"Error response from port {port}: {infoJson}", "TradeHubService");
                             continue;
                         }
-
-                        LogUtil.LogInfo($"     ✅ Response: {infoJson.Substring(0, Math.Min(100, infoJson.Length))}...", "TradeHubService");
 
                         // Parse the JSON to get the Mode
                         var info = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(infoJson);
                         if (info.TryGetProperty("Mode", out var modeElement))
                         {
                             var mode = modeElement.GetString() ?? "Unknown";
-                            LogUtil.LogInfo($"     ✅ Port {port} → Mode: {mode}", "TradeHubService");
                             instances.Add((port, mode));
                         }
                         else
                         {
-                            LogUtil.LogError($"     ❌ No 'Mode' property found in response", "TradeHubService");
+                            LogUtil.LogError($"No 'Mode' property found in response from port {port}", "TradeHubService");
                         }
                     }
                     else
                     {
-                        LogUtil.LogError($"     ❌ Failed to parse port from: {portText}", "TradeHubService");
+                        LogUtil.LogError($"Failed to parse port from: {portText}", "TradeHubService");
                     }
                 }
                 catch (Exception ex)
                 {
-                    LogUtil.LogError($"❌ Failed to query instance from file {portFile}: {ex.Message}", "TradeHubService");
+                    LogUtil.LogError($"Failed to query instance from file {portFile}: {ex.Message}", "TradeHubService");
                 }
-            }
-
-            LogUtil.LogInfo($"📊 Total instances discovered: {instances.Count}", "TradeHubService");
-            foreach (var (port, mode) in instances)
-            {
-                LogUtil.LogInfo($"   • Port {port} → {mode}", "TradeHubService");
             }
         }
         catch (Exception ex)
@@ -663,14 +769,30 @@ public class TradeHubService
         try
         {
             using var client = new System.Net.Sockets.TcpClient();
-            client.Connect("127.0.0.1", port);
 
+            // Set connection timeout
+            var connectTask = client.ConnectAsync("127.0.0.1", port);
+            if (!connectTask.Wait(TimeSpan.FromSeconds(5)))
+            {
+                LogUtil.LogError($"Connection to port {port} timed out", "TradeHubService");
+                return "ERROR: Connection timeout";
+            }
+
+            // Set read/write timeout
             using var stream = client.GetStream();
+            stream.ReadTimeout = 5000;
+            stream.WriteTimeout = 5000;
+
             using var writer = new System.IO.StreamWriter(stream, System.Text.Encoding.UTF8) { AutoFlush = true };
             using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8);
 
             writer.WriteLine(command);
             return reader.ReadLine() ?? "";
+        }
+        catch (System.IO.IOException ex) when (ex.InnerException is System.Net.Sockets.SocketException)
+        {
+            LogUtil.LogError($"Socket error querying port {port}: Connection timeout or refused", "TradeHubService");
+            return "ERROR: Connection failed";
         }
         catch (Exception ex)
         {
@@ -686,15 +808,24 @@ public class TradeHubService
     {
         try
         {
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var client = new System.Net.Sockets.TcpClient();
-            await client.ConnectAsync("127.0.0.1", port);
+
+            await client.ConnectAsync("127.0.0.1", port, cts.Token);
 
             using var stream = client.GetStream();
             using var writer = new System.IO.StreamWriter(stream, System.Text.Encoding.UTF8) { AutoFlush = true };
             using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8);
 
             await writer.WriteLineAsync(command);
-            return await reader.ReadLineAsync() ?? "";
+
+            var response = await reader.ReadLineAsync(cts.Token);
+            return response ?? "";
+        }
+        catch (System.OperationCanceledException)
+        {
+            LogUtil.LogError($"TCP command to port {port} timed out after 10 seconds", "TradeHubService");
+            return "ERROR: Timeout";
         }
         catch (Exception ex)
         {
