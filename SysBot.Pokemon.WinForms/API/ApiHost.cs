@@ -49,7 +49,11 @@ public class ApiHost : IDisposable
             builder.Logging.AddProvider(new CustomLoggerProvider());
 
             // Add services
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+                });
             builder.Services.AddSignalR();
 
             // Register TradeHubService as singleton

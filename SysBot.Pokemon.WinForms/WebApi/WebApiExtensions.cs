@@ -925,8 +925,12 @@ public static class WebApiExtensions
 
             var json = command.Substring(colonIndex + 1);
 
-            // Deserialize the request
-            var request = System.Text.Json.JsonSerializer.Deserialize<SysBot.Pokemon.WinForms.API.Models.TradeRequest>(json);
+            // Deserialize the request with case-insensitive options
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            var request = System.Text.Json.JsonSerializer.Deserialize<SysBot.Pokemon.WinForms.API.Models.TradeRequest>(json, options);
             if (request == null)
                 return "ERROR: Failed to deserialize TradeRequest";
 
@@ -949,8 +953,6 @@ public static class WebApiExtensions
     {
         try
         {
-            LogUtil.LogInfo($"========== HandleGetStatus called via TCP ==========", "WebApiExtensions");
-
             // Extract TradeId: GET_STATUS:{tradeId}
             var colonIndex = command.IndexOf(':');
             if (colonIndex == -1 || colonIndex == command.Length - 1)
@@ -960,21 +962,17 @@ public static class WebApiExtensions
             }
 
             var tradeId = command.Substring(colonIndex + 1);
-            LogUtil.LogInfo($"Querying status for TradeId: {tradeId}", "WebApiExtensions");
 
             // Get status using TradeHubService
             var status = SysBot.Pokemon.WinForms.API.Services.TradeHubService.GetTradeStatusDirectlyAsync(tradeId).Result;
 
             if (status == null)
             {
-                LogUtil.LogInfo($"Trade not found: {tradeId}", "WebApiExtensions");
                 return "ERROR: Trade not found";
             }
 
             // Serialize the response back as JSON
             var responseJson = System.Text.Json.JsonSerializer.Serialize(status);
-
-            LogUtil.LogInfo($"Status returned: {status.Status}", "WebApiExtensions");
 
             return responseJson;
         }

@@ -980,12 +980,21 @@ public class TradeHubService
 
             // Create trade detail with SignalR notifier
             var notifier = new SignalRTradeNotifier<T>(_hubContext, tradeId, response);
+
+            // Parse LGPE trade code if this is an LGPE trade
+            List<Pictocodes>? lgpeCodes = null;
+            if (typeof(T) == typeof(PB7) && !string.IsNullOrEmpty(request.LgpeTradeCode))
+            {
+                lgpeCodes = ParseLgpeTradeCode(request.LgpeTradeCode);
+            }
+
             var tradeDetail = new PokeTradeDetail<T>(
                 typedPkm,
                 trainerInfo,
                 notifier,
                 PokeTradeType.Specific,
                 tradeCode,
+                lgcode: lgpeCodes,
                 uniqueTradeID: (int)Interlocked.Increment(ref _uniqueTradeCounter)
             );
 
