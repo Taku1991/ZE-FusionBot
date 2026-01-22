@@ -251,7 +251,7 @@ namespace SysBot.Pokemon.WinForms
 
             try
             {
-                var (updateAvailable, _, newVersion) = await UpdateChecker.CheckForUpdatesAsync(); // Check for updates
+                var (updateAvailable, _, newVersion, _) = await UpdateChecker.CheckForUpdatesAsync(); // Check for updates
                 hasUpdate = updateAvailable; // If there's an update, this flag gets checked
                 _botsForm.SetUpdateNotification(updateAvailable, newVersion); // Show update notification in BotsForm
             }
