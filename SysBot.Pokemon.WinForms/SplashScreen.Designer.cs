@@ -1,3 +1,4 @@
+#nullable enable
 namespace SysBot.Pokemon.WinForms
 {
     partial class SplashScreen
@@ -5,8 +6,10 @@ namespace SysBot.Pokemon.WinForms
         /// <summary>
         /// Required designer variable.
         /// </summary>
-        private System.ComponentModel.IContainer components = null;
-        private System.Windows.Forms.PictureBox pictureBox;
+        private System.ComponentModel.IContainer? components = null;
+        #pragma warning disable CS0169 // Field is never used
+        private System.Windows.Forms.PictureBox? pictureBox;
+        #pragma warning restore CS0169
 
         /// <summary>
         /// Clean up any resources being used.
@@ -38,7 +41,7 @@ namespace SysBot.Pokemon.WinForms
             // 
             pictureBox1.BackColor = System.Drawing.Color.Black;
             pictureBox1.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
-            pictureBox1.Image = (System.Drawing.Image)resources.GetObject("pictureBox1.Image");
+            pictureBox1.Image = resources.GetObject("pictureBox1.Image") as System.Drawing.Image;
             pictureBox1.Location = new System.Drawing.Point(-1, -1);
             pictureBox1.Name = "pictureBox1";
             pictureBox1.Size = new System.Drawing.Size(527, 314);
@@ -63,6 +66,6 @@ namespace SysBot.Pokemon.WinForms
 
         #endregion
 
-        private System.Windows.Forms.PictureBox pictureBox1;
+        private System.Windows.Forms.PictureBox pictureBox1 = null!;
     }
 }

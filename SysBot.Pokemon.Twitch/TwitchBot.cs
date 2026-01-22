@@ -391,6 +391,12 @@ public class TwitchBot<T> : IChatBot where T : PKM, new()
         var userID = ulong.Parse(e.WhisperMessage.UserId);
         var name = e.WhisperMessage.DisplayName;
 
+        if (client == null)
+        {
+            msg = $"@{name}: Twitch client is not connected. Please try again later.";
+            return false;
+        }
+
         var trainer = new PokeTradeTrainerInfo(name, ulong.Parse(e.WhisperMessage.UserId));
         var notifier = new TwitchTradeNotifier<T>(pk, trainer, code, e.WhisperMessage.Username, client, Settings.Channel, Hub.Config.Twitch);
 

@@ -17,7 +17,7 @@ namespace SysBot.Pokemon.WinForms
     {
         private bool _isInitializing = false;
 
-        public PictureBox ImageOverlay;
+        public PictureBox ImageOverlay = null!;
         public FlowLayoutPanel BotPanel => _FLP_Bots;
 
         public Button StartButton => _B_Start;
@@ -37,28 +37,29 @@ namespace SysBot.Pokemon.WinForms
 
         private readonly List<BotController> BotControls = new();
 
-        private FancyButton _B_Start;
-        private FancyButton _B_Stop;
-        private FancyButton _B_RebootStop;
-        private FancyButton _updater;
-        private FancyButton _B_New;
-        private FancyButton _B_Reload;
-        private FancyButton _B_PKHeX;
-        private FancyButton _B_SwitchRemote;
-        private FancyButton _B_SysDVR;
-        private ToolTip _toolTips;
+        private FancyButton _B_Start = null!;
+        private FancyButton _B_Stop = null!;
+        private FancyButton _B_RebootStop = null!;
+        private FancyButton _updater = null!;
+        private FancyButton _B_New = null!;
+        private FancyButton _B_Reload = null!;
+        private FancyButton _B_PKHeX = null!;
+        private FancyButton _B_SwitchRemote = null!;
+        private FancyButton _B_SysDVR = null!;
+        private ToolTip _toolTips = null!;
 
+        private TextBox _TB_IP = null!;
+        private NumericUpDown _NUD_Port = null!;
 
-        private TextBox _TB_IP;
-        private NumericUpDown _NUD_Port;
+        private ComboBox _CB_Protocol = null!;
+        private ComboBox _CB_Routine = null!;
+        private ComboBox _CB_GameMode = null!;
 
-        private ComboBox _CB_Protocol;
-        private ComboBox _CB_Routine;
-        private ComboBox _CB_GameMode;
-
-        private FlowLayoutPanel _FLP_Bots;
-        private PictureBox _pictureBox1;
-        private Label _updateNotificationLabel;
+        private FlowLayoutPanel _FLP_Bots = null!;
+        #pragma warning disable CS0169 // Field is never used
+        private PictureBox? _pictureBox1;
+        #pragma warning restore CS0169
+        private Label _updateNotificationLabel = null!;
 
         public BotsForm()
         {
@@ -331,9 +332,9 @@ namespace SysBot.Pokemon.WinForms
             _CB_GameMode.DrawItem += (s, e) =>
             {
                 e.DrawBackground();
-                var cb = (ComboBox)s;
+                if (s is not ComboBox cb) return;
 
-                string text = (e.Index >= 0) ? cb.Items[e.Index].ToString() : "Game"; // ← Placeholder
+                string text = (e.Index >= 0) ? cb.Items[e.Index]?.ToString() ?? "Game" : "Game"; // ← Placeholder
                 using var brush = new SolidBrush(cb.ForeColor);
                 e.Graphics.DrawString(text, cb.Font, brush, e.Bounds);
             };
@@ -366,7 +367,7 @@ namespace SysBot.Pokemon.WinForms
             Size = new Size(722, 53);
         }
 
-        private void CB_GameMode_SelectedIndexChanged(object sender, EventArgs e)
+        private void CB_GameMode_SelectedIndexChanged(object? sender, EventArgs e)
         {
             if (_isInitializing)
                 return; // Don't do anything if we're still initializing
@@ -563,8 +564,8 @@ namespace SysBot.Pokemon.WinForms
             cb.DrawItem += (s, e) =>
             {
                 if (e.Index < 0) return;
+                if (s is not ComboBox combo) return;
 
-                ComboBox combo = (ComboBox)s;
                 e.DrawBackground();
 
                 // darker shade when selected
@@ -575,7 +576,7 @@ namespace SysBot.Pokemon.WinForms
                 using (SolidBrush bg = new SolidBrush(bgColor))
                     e.Graphics.FillRectangle(bg, e.Bounds);
 
-                string text = combo.GetItemText(combo.Items[e.Index]);
+                string text = combo.GetItemText(combo.Items[e.Index]) ?? string.Empty;
                 using (SolidBrush brush = new SolidBrush(whiteText))
                     e.Graphics.DrawString(text, combo.Font, brush, e.Bounds);
             };
