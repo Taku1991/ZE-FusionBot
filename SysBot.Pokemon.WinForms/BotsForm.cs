@@ -56,10 +56,11 @@ namespace SysBot.Pokemon.WinForms
         private ComboBox _CB_GameMode = null!;
 
         private FlowLayoutPanel _FLP_Bots = null!;
-        #pragma warning disable CS0169 // Field is never used
+#pragma warning disable CS0169 // Field is never used
         private PictureBox? _pictureBox1;
-        #pragma warning restore CS0169
-        private Label _updateNotificationLabel = null!;
+#pragma warning restore CS0169
+        private PictureBox _updateNotificationLabel = null!;
+        private Label _updateVersionLabel = null!;
 
         public BotsForm()
         {
@@ -270,35 +271,57 @@ namespace SysBot.Pokemon.WinForms
             _toolTips.ReshowDelay = 1000;
             _toolTips.ShowAlways = true;
 
-            // Update Notification Label
-            _updateNotificationLabel = new Label
+            // Update Notification Image
+            _updateNotificationLabel = new PictureBox
             {
-                AutoSize = false,
-                Size = new Size(170, 44),
-                Location = new Point(605, 44),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font("Segoe UI", 7.5F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(51, 255, 255),
+                SizeMode = PictureBoxSizeMode.AutoSize,
+                Size = new Size(132, 23),
+                Location = new Point(574, 59),
                 BackColor = Color.Transparent,
                 Visible = false,
-                Text = "",
-                Padding = new Padding(0),
-                BorderStyle = BorderStyle.None
+                Cursor = Cursors.Hand
             };
 
-            // Hover effect
-            _updateNotificationLabel.MouseEnter += (s, e) =>
+            // Load the update notification image from embedded resources
+            try
             {
-                _updateNotificationLabel.ForeColor = Color.FromArgb(71, 255, 255);
-            };
-
-            _updateNotificationLabel.MouseLeave += (s, e) =>
+                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                var resourceName = "SysBot.Pokemon.WinForms.Resources.new-release-update.png";
+                using (var stream = assembly.GetManifestResourceStream(resourceName))
+                {
+                    if (stream != null)
+                    {
+                        _updateNotificationLabel.Image = Image.FromStream(stream);
+                        System.Diagnostics.Debug.WriteLine("Update notification image loaded from embedded resources");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("Update notification image resource not found");
+                    }
+                }
+            }
+            catch (Exception ex)
             {
-                _updateNotificationLabel.ForeColor = Color.FromArgb(51, 255, 255);
-            };
+                System.Diagnostics.Debug.WriteLine($"Failed to load update notification image: {ex.Message}");
+            }
 
             _updateNotificationLabel.Click += (s, e) => _updater.PerformClick();
             _toolTips.SetToolTip(_updateNotificationLabel, "Click to view update details and download the latest version.");
+
+            // Update Version Label (displays version number above the image)
+            _updateVersionLabel = new Label
+            {
+                AutoSize = true,
+                Location = new Point(576, 44),
+                Font = new Font("Segoe UI", 7F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                Visible = false,
+                Text = "",
+                Cursor = Cursors.Hand
+            };
+            _updateVersionLabel.Click += (s, e) => _updater.PerformClick();
+            _toolTips.SetToolTip(_updateVersionLabel, "Click to view update details and download the latest version.");
 
             // Colors for boxes and controls
             Color darkBG = Color.FromArgb(20, 19, 57);
@@ -360,7 +383,7 @@ namespace SysBot.Pokemon.WinForms
                 Controls.AddRange(new Control[] {
                 _B_Start, _B_Stop, _B_RebootStop, _updater, _B_New,
                 _B_Reload, _B_PKHeX, _B_SwitchRemote, _B_SysDVR, _TB_IP, _NUD_Port, _CB_Protocol, _CB_Routine, _CB_GameMode,
-                _FLP_Bots, _updateNotificationLabel
+                _FLP_Bots, _updateNotificationLabel, _updateVersionLabel
             });
 
             Text = "Bots";
@@ -583,7 +606,7 @@ namespace SysBot.Pokemon.WinForms
         }
 
         /// <summary>
-        /// Shows or hides the update notification label with the specified version.
+        /// Shows or hides the update notification image with the specified version.
         /// </summary>
         /// <param name="isUpdateAvailable">Whether an update is available</param>
         /// <param name="newVersion">The new version string (e.g., "v7.3.9")</param>
@@ -597,12 +620,15 @@ namespace SysBot.Pokemon.WinForms
 
             if (isUpdateAvailable && !string.IsNullOrWhiteSpace(newVersion))
             {
-                _updateNotificationLabel.Text = $"UPDATE NOTICE\n{newVersion} Released!";
+                _updateVersionLabel.Text = $"Update now to {newVersion}";
+                _updateVersionLabel.Visible = true;
+                _updateVersionLabel.BringToFront();
                 _updateNotificationLabel.Visible = true;
                 _updateNotificationLabel.BringToFront();
             }
             else
             {
+                _updateVersionLabel.Visible = false;
                 _updateNotificationLabel.Visible = false;
             }
         }

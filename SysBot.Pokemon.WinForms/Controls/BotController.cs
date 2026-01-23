@@ -29,16 +29,16 @@ public partial class BotController : UserControl
     private Panel _progressBarContainer = null!;
     private Panel _progressFill = null!;
     private Timer _progressAnimationTimer = null!;
-    #pragma warning disable CS0169 // Field is never used
+#pragma warning disable CS0169 // Field is never used
     private Timer? _shimmerTimer;
-    #pragma warning restore CS0169
+#pragma warning restore CS0169
     private Timer _sparkleTimer = null!;
     private int _targetProgress = 0;
     private int _currentProgress = 0;
     private Color _glowColor = Color.Cyan;
-    #pragma warning disable CS0649 // Field is never assigned
+#pragma warning disable CS0649 // Field is never assigned
     private int _shimmerX;
-    #pragma warning restore CS0649
+#pragma warning restore CS0649
     private int _sparkleX = -50;
     private int _sparkleWidth = 50;
     private Color _startColor = Color.FromArgb(0, 122, 204);

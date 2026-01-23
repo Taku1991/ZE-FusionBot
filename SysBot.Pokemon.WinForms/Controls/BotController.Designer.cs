@@ -163,9 +163,9 @@ partial class BotController
     private Panel pnlStatus = null!;
     private Label lblStatus = null!;
     private Label lblConnectionInfo = null!;
-    #pragma warning disable CS0649 // Field is never assigned
+#pragma warning disable CS0649 // Field is never assigned
     private Label? lblLastLogTime;
-    #pragma warning restore CS0649
+#pragma warning restore CS0649
     private Label lblConnectionName = new Label();
     private Label lblRoutine = null!;
     private RichTextBox rtbBotMeta = null!;

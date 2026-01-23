@@ -38,10 +38,10 @@ public class FancyButton : Button
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Color GlowColor { get; set; } = Color.Cyan;
 
-    #pragma warning disable CS0414 // Field is assigned but never used
+#pragma warning disable CS0414 // Field is assigned but never used
     private bool isHovered = false;
     private bool isClicked = false;
-    #pragma warning restore CS0414
+#pragma warning restore CS0414
 
     // Shake state
     private Timer shakeTimer = null!;
@@ -50,10 +50,10 @@ public class FancyButton : Button
 
     // Animation timer drives glow pulse (runs always) and animation offset (not used here)
     private Timer animationTimer = null!;
-    #pragma warning disable CS0414 // Field is assigned but never used
+#pragma warning disable CS0414 // Field is assigned but never used
     private int animationOffset = 0;
     private bool animationForward = true;
-    #pragma warning restore CS0414
+#pragma warning restore CS0414
 
     private const int animationSpeed = 2;  // pixels per tick
     private const int animationRange = 100;
