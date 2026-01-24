@@ -896,10 +896,23 @@ public sealed partial class SysCord<T> where T : PKM, new()
             await _interactions.AddModulesAsync(assembly, _services).ConfigureAwait(false);
 
             // Manually add generic interaction modules with the specific type T
-            foreach (var t in assembly.DefinedTypes.Where(z => z.IsSubclassOf(typeof(InteractionModuleBase<SocketInteractionContext>)) && z.IsGenericType))
+            // Note: IsSubclassOf doesn't work for open generic types, so we check the base type directly
+            foreach (var t in assembly.DefinedTypes.Where(z =>
+                z.IsGenericTypeDefinition &&
+                z.BaseType != null &&
+                z.BaseType.IsGenericType &&
+                z.BaseType.GetGenericTypeDefinition() == typeof(InteractionModuleBase<>)))
             {
-                var genModule = t.MakeGenericType(typeof(T));
-                await _interactions.AddModuleAsync(genModule, _services).ConfigureAwait(false);
+                try
+                {
+                    var genModule = t.MakeGenericType(typeof(T));
+                    await _interactions.AddModuleAsync(genModule, _services).ConfigureAwait(false);
+                    await Log(new LogMessage(LogSeverity.Debug, "Slash Commands", $"Registered generic module: {t.Name}<{typeof(T).Name}>")).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await Log(new LogMessage(LogSeverity.Warning, "Slash Commands", $"Failed to register {t.Name}: {ex.Message}")).ConfigureAwait(false);
+                }
             }
 
             // Register slash commands either globally or to a specific guild
