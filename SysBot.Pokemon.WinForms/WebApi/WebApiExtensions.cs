@@ -578,25 +578,56 @@ public static class WebApiExtensions
                 return "ERROR: Main form not initialized";
             }
 
-            LogUtil.LogInfo("WebApiExtensions", $"Update triggered for instance on port {_tcpPort}");
+            LogUtil.LogInfo("WebApiExtensions", $"Update triggered for slave instance on port {_tcpPort}");
 
-            _main.BeginInvoke((System.Windows.Forms.MethodInvoker)(async () =>
+            // Perform the actual update: download, install, and restart (same as master)
+            _ = Task.Run(async () =>
             {
                 try
                 {
-                    var (updateAvailable, _, newVersion, _) = await UpdateChecker.CheckForUpdatesAsync(false);
-                    if (updateAvailable || true) // Always allow update when triggered remotely
+                    // Check for updates and get download URL
+                    var (updateAvailable, _, newVersion, downloadUrl) = await UpdateChecker.CheckForUpdatesAsync(false);
+
+                    if (!updateAvailable && string.IsNullOrEmpty(downloadUrl))
                     {
-                        // Directly restart without showing UpdateForm (automated update from WebUI)
-                        LogUtil.LogInfo("WebApiExtensions", "Starting application restart for update");
-                        Application.Restart();
+                        LogUtil.LogInfo("WebApiExtensions", "No update available, but proceeding with restart for sync");
+                        _main.BeginInvoke((System.Windows.Forms.MethodInvoker)(() => Application.Restart()));
+                        return;
                     }
+
+                    if (string.IsNullOrEmpty(downloadUrl))
+                    {
+                        LogUtil.LogError("WebApiExtensions", "No download URL available for update");
+                        lock (_updateLock) { _updateInProgress = false; }
+                        return;
+                    }
+
+                    LogUtil.LogInfo("WebApiExtensions", $"Downloading update from: {downloadUrl}");
+
+                    // Download the update
+                    string tempPath = await DownloadUpdateForSlaveAsync(downloadUrl);
+
+                    if (string.IsNullOrEmpty(tempPath))
+                    {
+                        LogUtil.LogError("WebApiExtensions", "Failed to download update");
+                        lock (_updateLock) { _updateInProgress = false; }
+                        return;
+                    }
+
+                    LogUtil.LogInfo("WebApiExtensions", $"Update downloaded to: {tempPath}");
+
+                    // Install the update via batch script (same as master does)
+                    _main.BeginInvoke((System.Windows.Forms.MethodInvoker)(() =>
+                    {
+                        InstallUpdateAndRestartSlave(tempPath);
+                    }));
                 }
                 catch (Exception ex)
                 {
-                    LogUtil.LogError("WebApiExtensions", $"Error during update: {ex.Message}");
+                    LogUtil.LogError("WebApiExtensions", $"Error during slave update: {ex.Message}");
+                    lock (_updateLock) { _updateInProgress = false; }
                 }
-            }));
+            });
 
             return "OK: Update triggered";
         }
@@ -604,6 +635,98 @@ public static class WebApiExtensions
         {
             lock (_updateLock) { _updateInProgress = false; }
             return $"ERROR: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Download update file for slave instance
+    /// </summary>
+    private static async Task<string> DownloadUpdateForSlaveAsync(string downloadUrl)
+    {
+        try
+        {
+            var uri = new Uri(downloadUrl);
+            var originalFileName = Path.GetFileName(uri.LocalPath);
+            string tempPath = Path.Combine(Path.GetTempPath(), $"{Path.GetFileNameWithoutExtension(originalFileName)}_{Guid.NewGuid()}.exe");
+
+            using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+            client.DefaultRequestHeaders.Add("User-Agent", "ZE-FusionBot");
+
+            var response = await client.GetAsync(downloadUrl);
+            response.EnsureSuccessStatusCode();
+
+            var fileBytes = await response.Content.ReadAsByteArrayAsync();
+            await File.WriteAllBytesAsync(tempPath, fileBytes);
+
+            LogUtil.LogInfo("WebApiExtensions", $"Downloaded {fileBytes.Length} bytes to {tempPath}");
+            return tempPath;
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError("WebApiExtensions", $"Failed to download update: {ex.Message}");
+            return string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Install update and restart slave instance (creates batch script like master)
+    /// </summary>
+    private static void InstallUpdateAndRestartSlave(string downloadedFilePath)
+    {
+        try
+        {
+            string currentExePath = Application.ExecutablePath;
+            string applicationDirectory = Path.GetDirectoryName(currentExePath) ?? "";
+            string executableName = Path.GetFileName(currentExePath);
+
+            // Use ZE_FusionBot.exe as the target name (standardized name)
+            string targetExeName = "ZE_FusionBot.exe";
+            string targetExePath = Path.Combine(applicationDirectory, targetExeName);
+            string backupPath = Path.Combine(applicationDirectory, $"{executableName}.backup");
+
+            // Create batch file for update process
+            string batchPath = Path.Combine(Path.GetTempPath(), $"UpdateSysBot_Slave_{Environment.ProcessId}.bat");
+            string batchContent = @$"
+@echo off
+timeout /t 2 /nobreak >nul
+echo Updating ZE-FusionBot (Slave Instance)...
+rem Backup current version
+if exist ""{currentExePath}"" (
+    if exist ""{backupPath}"" (
+        del ""{backupPath}""
+    )
+    move ""{currentExePath}"" ""{backupPath}""
+)
+rem Install new version with standardized name
+move ""{downloadedFilePath}"" ""{targetExePath}""
+rem Start new version
+start """" ""{targetExePath}""
+rem Clean up
+del ""%~f0""
+";
+
+            File.WriteAllText(batchPath, batchContent);
+
+            LogUtil.LogInfo("WebApiExtensions", "Starting slave update batch script");
+
+            // Start the update batch file
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = batchPath,
+                CreateNoWindow = true,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+            Process.Start(startInfo);
+
+            // Exit the current instance
+            LogUtil.LogInfo("WebApiExtensions", "Exiting slave instance for update");
+            Application.Exit();
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError("WebApiExtensions", $"Failed to install slave update: {ex.Message}");
+            lock (_updateLock) { _updateInProgress = false; }
         }
     }
 
