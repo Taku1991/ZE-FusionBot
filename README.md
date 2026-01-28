@@ -1,8 +1,8 @@
 <h1 align="center">
-    <a href="https://amplication.com/#gh-light-mode-only">
+    <a href="https://github.com/Taku1991/ZE-FusionBot#gh-light-mode-only">
     <img src="https://i.imgur.com/0HWW0te.png">
     </a>
-    <a href="https://amplication.com/#gh-dark-mode-only">
+    <a href="https://github.com/Taku1991/ZE-FusionBot#gh-dark-mode-only">
     <img src="https://i.imgur.com/0HWW0te.png">
     </a>
 </h1>
@@ -10,7 +10,7 @@
 > ⚠️ **Font Notice:** If the program's fonts are not displaying properly for you, download them [here](https://github.com/Taku1991/ZE-FusionBot/blob/main/.extra/Fonts.7z) and install them on your machine.
 
 <p align="center">
-  <i>A community-driven and inspired SysBot.NET project with the most beautiful GUI that unites code from everyone, supporting LGPE, SWSH, BDSP, PLA, SV, and PLZA!</i>
+  <i>Taku1991's fork of ZE-FusionBot — an independently evolved SysBot.NET project with custom enhancements, supporting LGPE, SWSH, BDSP, PLA, SV, and PLZA!</i>
 </p>
 <h2 align="center">
   Join our community at <a href="https://discord.gg/pokemonhideout">Pokemon Hideout</a>!
@@ -31,76 +31,68 @@
 
 ## 🚀 Introduction
 
-`ZE FusionBot` is a powerful and open-source SysBot.NET fork, forked from [Secludedly's ZE FusionBot](https://github.com/Secludedly/ZE-FusionBot) and customized for the [Pokemon Hideout](https://discord.gg/pokemonhideout) community. It features a beautiful, community-powered GUI with dozens of integrated forks and unique enhancements, catering to every Nintendo Switch Pokémon game.
+`ZE FusionBot (Taku1991 Fork)` is an independently maintained fork of [Secludedly's ZE FusionBot](https://github.com/Secludedly/ZE-FusionBot), featuring custom enhancements, bug fixes, and optimizations developed for the [Pokemon Hideout](https://discord.gg/pokemonhideout) community. This fork shares ideas and improvements back with the original project while maintaining its own development direction.
 
 ---
 <p align="center">
     <img src="https://i.imgur.com/zJF8VmN.gif" style="max-width: 100%; height: auto;">
 </p>
 
-## 🧬 Community Roots & Inspirations
+## 🧬 Fork Philosophy & Origins
 
-> **ZE FusionBot is a fusion by design — built from years of shared ideas, forks, experiments, and respect for the SysBot.NET ecosystem.**
+> **This fork focuses on stability, usability improvements, and custom features tailored for the Pokemon Hideout community.**
 
-ZE FusionBot was created, inspired, and upgraded through time, in pieces, through a collaboration of multiple developers of all skill levels with bright ideas and a hobby. There's many I know, and many I don't know, but I have respect and appreciation for them all. If they didn't inspire or help, simply diving into their code and learning C# over the years through their contributions helped me get to this point to continue to refine ZE FusionBot and is also what allowed this project to grow into one of - if not *the best* SysBot program to date, in large to **[@hexbyt3's](https://github.com/hexbyt3)** **[PokeBot](https://github.com/hexbyt3/PokeBot)**, another contender as *the best* SysBot.
+This project is built upon the excellent work of many developers in the SysBot.NET ecosystem. Special thanks to:
 
-The projects below represent **the strongest influences** in the SysBot.NET space and the inspiration behind calling this a **Fusion** bot.
+- **[Secludedly's ZE FusionBot](https://github.com/Secludedly/ZE-FusionBot)** — The original ZE FusionBot that this fork is based on
+- **[kwsch's SysBot.NET](https://github.com/kwsch/SysBot.NET)** — The foundation of all SysBot projects
+- **[hexbyt3's PokeBot](https://github.com/hexbyt3/PokeBot)** — Major inspiration for features and structure
 
 <details>
-<summary><strong>🧬 Click to view credits & inspirations</strong></summary><br />
+<summary><strong>🧬 Click to view full credits & inspirations</strong></summary><br />
 
 ### 🧬 Foundational Projects
 
-- **[SysBot.NET](https://github.com/kwsch/SysBot.NET)**  
-  Created by **[@kwsch](https://github.com/kwsch)** — also the creator of PKHeX.  
+- **[SysBot.NET](https://github.com/kwsch/SysBot.NET)**
+  Created by **[@kwsch](https://github.com/kwsch)** — also the creator of PKHeX.
   *The origin of everything.*
 
-- **[ForkBot.NET](https://github.com/Koi-3088/ForkBot.NET)**  
-  Developed by **[@Koi-3088](https://github.com/Koi-3088)**.  
-  One of the earliest and most influential forks. TradeCord will never be forgotten.
-  Somewhat of a friend for a while, but it's been many years, yet his talent had me learn so much.
+- **[ForkBot.NET](https://github.com/Koi-3088/ForkBot.NET)**
+  Developed by **[@Koi-3088](https://github.com/Koi-3088)**.
+  One of the earliest and most influential forks.
 
-- **[SysBot.NET (berichan fork)](https://github.com/berichan/SysBot.NET)**  
-  An insightful and clever fork by **[@berichan](https://github.com/berichan)** that helped shape many later ideas.
-  Many years ago, I'd take and modify beri's work to learn more about C#.
+- **[SysBot.NET (berichan fork)](https://github.com/berichan/SysBot.NET)**
+  An insightful fork by **[@berichan](https://github.com/berichan)**.
 
-- **[SysBot.NET (Lusamine fork)](https://github.com/Lusamine/SysBot.NET)**  
-  A respected fork that stayed close to the original vision, maintained by **[@Lusamine](https://github.com/Lusamine)**.
+- **[SysBot.NET (Lusamine fork)](https://github.com/Lusamine/SysBot.NET)**
+  Maintained by **[@Lusamine](https://github.com/Lusamine)**.
 
-- **[SysBot.NET (santacrab fork)](https://github.com/santacrab2/SysBot.NET)**  
-  A long-followed fork by **[@santacrab2](https://github.com/santacrab2)** — a brilliant developer and dear local friend.
+- **[SysBot.NET (santacrab fork)](https://github.com/santacrab2/SysBot.NET)**
+  By **[@santacrab2](https://github.com/santacrab2)**.
 
 ---
 
 ### 🔧 Evolutionary & Community-Driven Bots
 
-- **[MergeBot](https://github.com/Paschar1/MergeBot)**  
-  Originally created by **[@bakakaito](https://github.com/bakakaito)** (now offline), possibly preserved by **[@Paschar1](https://github.com/Paschar1)**.  
-  One of the first major user-driven evolutions of SysBot.
+- **[MergeBot](https://github.com/Paschar1/MergeBot)**
+  Originally by **[@bakakaito](https://github.com/bakakaito)**, preserved by **[@Paschar1](https://github.com/Paschar1)**.
 
-- **[PokeBot](https://github.com/hexbyt3/PokeBot)**  
-  Created by **[@hexbyt3](https://github.com/hexbyt3)**, a brilliant friend of mine — and the **primary foundation of ZE FusionBot**.  
-  Much of FusionBot’s structure, philosophy, and stability originates here, alongside deep collaboration and shared ideas between repos.
+- **[PokeBot](https://github.com/hexbyt3/PokeBot)**
+  Created by **[@hexbyt3](https://github.com/hexbyt3)** — primary inspiration for many features.
+
+- **[ZE-FusionBot](https://github.com/Secludedly/ZE-FusionBot)**
+  Created by **[@Secludedly](https://github.com/Secludedly)** — the original FusionBot this fork is based on.
 
 ---
 
 ### 🚀 Additional Inspirations
 
 - **[SysBot.NET (easyworld fork)](https://github.com/easyworld/SysBot.NET)** — by **[@easyworld](https://github.com/easyworld)**
-A fork I've followed for some time that's given me inspiration in the past
 - **[ManuBot.NET](https://github.com/Manu098vm/ManuBot.NET)** — by **[@Manu098vm](https://github.com/Manu098vm)**
-A fork I've been following for update inspiration with great C# knowledge
 - **[ManuBot.NET (9B1td0 fork)](https://github.com/9B1td0/ManuBot.NET)** — by **[@9B1td0](https://github.com/9B1td0)**
-I believe this is a fork of ManuBot.NET but seems almost collaborated with the original.
 - **[DudeBot.NET](https://github.com/Havokx89/DudeBot.NET)** — by **[@Havokx89](https://github.com/Havokx89)**
-A fun and fused iteration combining a lot of ZE FusionBot that I follow for various integration ideas.
 - **[ZenBot.NET](https://github.com/Omni-KingZeno/ZenBot.NET)** — by **[@Omni-KingZeno](https://github.com/Omni-KingZeno)**
-A fork of ManuBot.NET that I follow and quite enjoy getting inspiration from. Plus, great bot name and username. I'm a DBtard.
 - **[TradeBot](https://github.com/jonklee99/Tradebot)** — by **[@jonklee99](https://github.com/jonklee99)** with **[@joseph11024](https://github.com/joseph11024)**
-Created by a good friend that tends to use their own ideas that I've happily borrowed from before.
-- **[ZE-FusionBot (Taku1991 fork)](https://github.com/Taku1991/ZE-FusionBot)** — by **[@Taku1991](https://github.com/Taku1991)**.  
-An independently evolved fork that shares ideas, structure, and inspiration within the ZE FusionBot ecosystem that I myself have proudly borrowed from.
-
 
 </details>
 
@@ -421,27 +413,27 @@ An independently evolved fork that shares ideas, structure, and inspiration with
 | `.MetDate=` | `Met Date:` | Supports flexible date formats. |
 | `.StatNature=` | `Stat Nature:` | Accepts a Nature keyword. |
 | `~=Version=` | `Game:` or `Version:` | Supports full game names or abbreviations. |
-| `.MetLocation=` | `Met Location:` | [Numeric IDs](https://github.com/Secludedly/ZE-FusionBot?tab=readme-ov-file#-met-location-reference) & [Location names](https://github.com/Secludedly/ZE-FusionBot/blob/f72fded7b30c1c6a03bd1cf22f3366f88ec9b257/SysBot.Pokemon/Helpers/BatchCommandNormalizer.cs#L780) supported. |
+| `.MetLocation=` | `Met Location:` | Numeric IDs & Location names supported. |
 | `.HyperTrainFlags=` | `HyperTrain:` | True / False. |
 | `.HT_[STAT]=` | `HT:` | Supports HP, Atk, Def, SpA, SpD, Spe. |
-| `.Moves=` | `Moves:` | “Random” generates random moves. |
-| `.RelearnMoves=` | `Relearn Moves:` | “All” or “None” accepted. |
-| `.Ribbons=` | `Ribbons:` | “All” or “None” supported. |
+| `.Moves=` | `Moves:` | "Random" generates random moves. |
+| `.RelearnMoves=` | `Relearn Moves:` | "All" or "None" accepted. |
+| `.Ribbons=` | `Ribbons:` | "All" or "None" supported. |
 | `.RibbonMark[mark]=True` | `Mark:` | Mark names without spaces (e.g., BestFriends). |
 | `.Ribbon[name]=True` | `Ribbon:` | Ribbon names without spaces (e.g., BattleChampion). |
 | `.SetEVs=` | `Set EVs:` | Accepts `Random`, or `Suggest`. |
 | `.SetIVs=` | `Set IVs:` | Accepts `Random`, or presets like `1IV`–`6IV`. |
 | `.GV_[STAT]=` | `GVs:` | Supports HP, Atk, Def, SpA, SpD, Spe. |
 | `.Marking[type]=` | `Markings:` | Diamond, Heart, Square, Star, Triangle, Circle in Red or Blue `Markings: Diamond=Red / Circle=Blue` etc. |
-| `.Characteristic=` | `Characteristic:` | Type out a [characteristic](https://github.com/Secludedly/ZE-FusionBot?tab=readme-ov-file#-characteristic-reference). |
+| `.Characteristic=` | `Characteristic:` | Type out a characteristic. |
 | `.Nickname=` | `Nickname:` | Write "Suggest" for a random nickname pulled from code dictionary. |
 
 ---
 
 ## 🧭 Slash Command Support
 
-ZE FusionBot supports **modern Discord Slash Commands** for fast, clean Pokémon creation across all supported games.  
-These commands integrate directly with the bot’s legality pipeline and AutoOT logic.
+ZE FusionBot supports **modern Discord Slash Commands** for fast, clean Pokémon creation across all supported games.
+These commands integrate directly with the bot's legality pipeline and AutoOT logic.
 
 ### 🎮 Available Slash Commands
 
@@ -452,7 +444,7 @@ These commands integrate directly with the bot’s legality pipeline and AutoOT 
 | `/create-bdsp` | Brilliant Diamond / Shining Pearl |
 | `/create-pla` | Legends: Arceus |
 | `/create-plza` | Legends: Z-A |
-| `/create-lgpe` | Let’s Go Pikachu / Eevee |
+| `/create-lgpe` | Let's Go Pikachu / Eevee |
 
 ### 🔹 Notes
 - Slash commands provide **guided Pokémon creation** without needing manual Showdown formatting.
@@ -460,50 +452,6 @@ These commands integrate directly with the bot’s legality pipeline and AutoOT 
 - Ideal for newer users or servers that want a **clean, modern interaction flow**.
 
 > Text commands and batch systems remain fully supported — slash commands simply add another powerful option.
-
----
-
-### 📍 Met Location Reference
-- **Gen 2–8 Locations:** [Imgur](https://i.imgur.com/v02WMmL.jpeg)  
-- **SWSH/BDSP/PLA/SV/PLZA Locations:** [Pastebin](https://pastebin.com/NBu14c6q)
-
-> 🔹 `Met Location:` now supports **numeric IDs** AND **location names**. See above references for valid values per generation.
-
----
-
-### 💠 Characteristic Reference
-| Characteristic | IV Set | IV Type |
-|----------------|--------|---------|
-| `Likes to eat` | 30, 8, 13, 18, 23, 25 | HP |
-| `Takes plenty of siestas` | 31, 6, 26, 22, 10, 0 | HP |
-| `Scatters things often` | 28, 8, 28, 12, 9, 19 | HP |
-| `Likes to relax` | 29, 16, 3, 7, 26, 13 | HP |
-| `Nods off a lot` | 27, 0, 13, 27, 27, 8 | HP |
-| `Proud of its power` | 18, 30, 10, 11, 26, 3 | Attack |
-| `Likes to thrash about` | 10, 31, 0, 3, 12, 0 | Attack |
-| `A little quick tempered` | 25, 27, 9, 7, 8, 8 | Attack |
-| `Quick tempered` | 0, 29, 6, 23, 4, 17 | Attack |
-| `Likes to fight` | 25, 28, 11, 8, 9, 18 | Attack |
-| `Sturdy body` | 15, 24, 30, 5, 24, 29 | Defense |
-| `Capable of taking hits` | 6, 0, 21, 2, 18, 3 | Defense |
-| `Highly persistent` | 4, 21, 27, 9, 21, 18 | Defense |
-| `Good endurance` | 19, 2, 23, 2, 6, 4 | Defense |
-| `Good perseverance` | 26, 16, 29, 0, 20, 22 | Defense |
-| `Highly curious` | 9, 6, 21, 30, 10, 28 | Special Attack |
-| `Mischievous` | 7, 20, 0, 31, 5, 17 | Special Attack |
-| `Thoroughly cunning` | 5, 4, 20, 27, 12, 26 | Special Attack |
-| `Often lost in thought` | 8, 3, 1, 23, 19, 14 | Special Attack |
-| `Very finicky` | 9, 1, 0, 24, 21, 12 | Special Attack |
-| `Strong willed` | 14, 6, 29, 16, 30, 0 | Special Defense |
-| `Somewhat vain` | 10, 5, 10, 15, 26, 15 | Special Defense |
-| `Strongly defiant` | 10, 10, 12, 3, 12, 10 | Special Defense |
-| `Hates to lose` | 3, 8, 13, 18, 23, 2 | Special Defense |
-| `Somewhat stubborn` | 4, 9, 14, 19, 24, 15 | Special Defense |
-| `Likes to run` | 2, 7, 12, 17, 22, 30 | Speed |
-| `Alert to sounds` | 31, 31, 31, 31, 31, 31 | Speed |
-| `Impetuous and silly` | 2, 7, 12, 17, 22, 27 | Speed |
-| `Somewhat of a clown` | 3, 8, 13, 18, 23, 28 | Speed |
-| `Quick to flee` | 4, 9, 14, 19, 24, 29 | Speed |
 
 ---
 
@@ -532,48 +480,55 @@ Markings: Diamond=Red / Heart=Red / Square=Blue / Star=Blue / Triangle=Red / Cir
 ## ⚙️ Bot Functions
 
 ### 🧑‍🎓 AutoOT
-FusionBot automatically applies your **trainer information** based on the save file you’re currently using.  
-- Your **OT / TID / SID / OTGender** are applied automatically.  
-- To keep the trainer info in your own files, attach them with `t true`.  
-- For Showdown Sets, simply include the OT/TID/SID you want — AutoOT will then be disabled.  
+FusionBot automatically applies your **trainer information** based on the save file you're currently using.
+- Your **OT / TID / SID / OTGender** are applied automatically.
+- To keep the trainer info in your own files, attach them with `t true`.
+- For Showdown Sets, simply include the OT/TID/SID you want — AutoOT will then be disabled.
 
 This ensures all trades feel natural and consistent with your game, while still letting you override it if you want custom trainer data.
 
 ---
 
 ### 🔗 Link Trade Codes
-FusionBot assigns you a **personal static Link Trade Code** on your first trade.  
-- This code is **unique to you** and stays the same for all future trades.  
-- To reset it: use `dtc` (your next trade gives you a new random code).  
-- To customize it: use `ctc 12345678` (sets your permanent code to whatever you choose).  
+FusionBot assigns you a **personal static Link Trade Code** on your first trade.
+- This code is **unique to you** and stays the same for all future trades.
+- To reset it: use `dtc` (your next trade gives you a new random code).
+- To customize it: use `ctc 12345678` (sets your permanent code to whatever you choose).
 
-This makes trading smoother by removing guesswork — your link code is always ready.  
+This makes trading smoother by removing guesswork — your link code is always ready.
 
 ---
 
 ### 🏅 Medals & Milestones
-Every trade you complete is tracked by FusionBot, and your **trade count** shows up in the footer of the trade embed.  
-- For every **50 trades**, you earn a new medal 🥇.  
-- You can check your medals anytime in your profile card with the `mi` command.  
-- It’s just for fun — a little **progression system** to show off your trading dedication.  
+Every trade you complete is tracked by FusionBot, and your **trade count** shows up in the footer of the trade embed.
+- For every **50 trades**, you earn a new medal 🥇.
+- You can check your medals anytime in your profile card with the `mi` command.
+- It's just for fun — a little **progression system** to show off your trading dedication.
 
-Think of it like leveling up — the more you trade, the more medals you rack up, proving you’re a true master trader.  
+Think of it like leveling up — the more you trade, the more medals you rack up, proving you're a true master trader.
 
 ---
 
 ### 🤖 Reading DMs Sent to the Bot
-You can now read the DMs a user sends to the bot. This is fun for when people think your bot is a real person and they attempt to speak to it, or get enraged at it because their internet sucks or don't have NSO. As sad as it is, sometimes users will send derogatory/racial/sexist messages to your bot thinking no one can see it, but now you can, and if they speak like that, do you really want them in your server? 
+You can now read the DMs a user sends to the bot. This is useful for moderation purposes.
 - Visit the **UserDMsToBotForwarder** option in `Hub -> Discord` and insert a Channel ID, then restart the bot.
 - The DMs that get logged are only those without a command, so you will not get flooded with user command input.
-- You'll also be able to see attachments users send to the bot, but beware, because it can get weird. I learned from experience.
+- You'll also be able to see attachments users send to the bot.
 
 ---
 
-## 🔗 Other Projects
+## 🔗 Related Projects
 
-- [**Switch Remote for PC**](https://github.com/Secludedly/Switch-Remote-For-PC) — GUI to control Switch from PC.
-- [**PKHeX ALM Releases**](https://github.com/Secludedly/PKHeX-ALM-Releases/releases) — PKHeX + AutoLegalityMod pre-built with config files.
+- [**ZE-FusionBot (Original)**](https://github.com/Secludedly/ZE-FusionBot) — The original ZE FusionBot by Secludedly
+- [**SysBot.NET**](https://github.com/kwsch/SysBot.NET) — The foundation project by kwsch
+- [**PKHeX**](https://github.com/kwsch/PKHeX) — Pokémon save file editor
 
-## 🤝 Supported Projects
+## 🛠️ Tools by Taku1991
 
-- [**HideoutPK**](https://hideoutpk.de) — Pokemon trading community and resources.
+- [**Hideout-PK**](https://www.hideout-pk.de/) — Pokemon Hideout Homepage
+- [**Showdown Set Builder (DE)**](https://www.hideout-pk.de/setbuilder) — German Showdown Set Builder for easy Pokémon creation
+- [**SV Raid Finder (DE)**](https://www.hideout-pk.de/raid-finder) — German Scarlet/Violet Raid Finder
+
+## 🤝 Community
+
+- [**Pokemon Hideout Discord**](https://discord.gg/pokemonhideout) — Join our community for support and trading
