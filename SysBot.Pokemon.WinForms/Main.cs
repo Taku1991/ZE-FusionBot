@@ -435,7 +435,7 @@ namespace SysBot.Pokemon.WinForms
                 {
                     Invoke((Action)(() =>
                     {
-                        Text = $"{(string.IsNullOrEmpty(Config.Hub.BotName) ? "ZE FusionBot |" : Config.Hub.BotName)} {TradeBot.Version} | Mode: {newMode}";
+                        Text = $"{(string.IsNullOrEmpty(Config.Hub.BotName) ? "ZE FusionBot |" : Config.Hub.BotName)} {PokeBot.Version} | Mode: {newMode}";
                         lblTitle.Text = Text;
                         UpdateBackgroundImage(newMode);
                         UpdateUpperImage(newMode);
@@ -443,7 +443,7 @@ namespace SysBot.Pokemon.WinForms
                 }
                 else
                 {
-                    Text = $"{(string.IsNullOrEmpty(Config.Hub.BotName) ? "ZE FusionBot |" : Config.Hub.BotName)} {TradeBot.Version} | Mode: {newMode}";
+                    Text = $"{(string.IsNullOrEmpty(Config.Hub.BotName) ? "ZE FusionBot |" : Config.Hub.BotName)} {PokeBot.Version} | Mode: {newMode}";
                     lblTitle.Text = Text;
                     UpdateBackgroundImage(newMode);
                     UpdateUpperImage(newMode);

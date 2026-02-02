@@ -46,6 +46,8 @@ public static class DetailsExtractor<T> where T : PKM, new()
             (SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.ShowMetDate ? $"**Met Date:** {embedData.MetDate}\n" : "") +
             (SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.ShowAbility ? $"**Ability:** {embedData.Ability}\n" : "") +
             (SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.ShowNature ? $"**{embedData.Nature}** Nature\n" : "") +
+            // Show Stat Nature for PLZA only, and only if it differs from regular Nature
+            (pk.Version is GameVersion.ZA && SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.ShowNature && !string.IsNullOrEmpty(embedData.StatNature) ? $"**Stat Nature:** {embedData.StatNature}\n" : "") +
             (SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.ShowLanguage ? $"**Language**: {embedData.Language}\n" : "") +
             (SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.ShowIVs ? $"**IVs**: {embedData.IVsDisplay}\n" : "") +
             (SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.ShowEVs && !string.IsNullOrWhiteSpace(embedData.EVsDisplay) ? $"**EVs**: {embedData.EVsDisplay}\n" : "");
@@ -84,7 +86,7 @@ public static class DetailsExtractor<T> where T : PKM, new()
     {
         if (isCloneRequest || isSpecialRequest)
         {
-            embedBuilder.WithThumbnailUrl("https://raw.githubusercontent.com/hexbyt3/sprites/main/profoak.png");
+            embedBuilder.WithThumbnailUrl("https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/profoak.png");
         }
         else if (!string.IsNullOrEmpty(heldItemUrl))
         {
@@ -132,6 +134,13 @@ public static class DetailsExtractor<T> where T : PKM, new()
 
         embedData.Ability = GetAbilityName(pk, strings);
         embedData.Nature = GetNatureName(pk, strings);
+
+        // For PLZA (PA9), extract Stat Nature if it differs from regular Nature
+        if (pk is PA9 && pk.StatNature != pk.Nature)
+        {
+            embedData.StatNature = strings.natures[(int)pk.StatNature];
+        }
+
         embedData.SpeciesName = strings.Species[pk.Species];
         embedData.SpecialSymbols = GetSpecialSymbols(pk);
         embedData.FormName = ShowdownParsing.GetStringFromForm(pk.Form, strings, pk.Species, pk.Context);
@@ -228,29 +237,26 @@ public static class DetailsExtractor<T> where T : PKM, new()
             userDetailsText += $"Total User Trades: {totalTradeCount} | Medals: {totalMedals}\n";
         }
 
-        // First trade — no record exists yet
-        if (tradeDetails == null)
-        {
-            userDetailsText += "First Trade, No Trainer Info Saved.";
-            return userDetailsText;
-        }
-
         // Display trainer info if storage enabled
         if (SysCord<T>.Runner.Config.Trade.TradeConfiguration.StoreTradeCodes)
         {
             List<string> trainerParts = new();
 
-            if (!string.IsNullOrEmpty(tradeDetails.OT))
-                trainerParts.Add($"OT: {tradeDetails.OT}");
+            // Only populate trainer parts if tradeDetails exists
+            if (tradeDetails != null)
+            {
+                if (!string.IsNullOrEmpty(tradeDetails.OT))
+                    trainerParts.Add($"OT: {tradeDetails.OT}");
 
-            if (tradeDetails.TID > 0)
-                trainerParts.Add($"TID: {tradeDetails.TID}");
+                if (tradeDetails.TID > 0)
+                    trainerParts.Add($"TID: {tradeDetails.TID}");
 
-            // SID is no longer force-rejected, we just show it if it exists
-            if (tradeDetails.SID > 0)
-                trainerParts.Add($"SID: {tradeDetails.SID}");
+                // SID is no longer force-rejected, we just show it if it exists
+                if (tradeDetails.SID > 0)
+                    trainerParts.Add($"SID: {tradeDetails.SID}");
+            }
 
-            // If user exists but no trainer fields are populated
+            // If no trainer info available (null or empty)
             if (trainerParts.Count == 0)
                 trainerParts.Add("Trainer Info Not Yet Recorded");
 
@@ -489,6 +495,9 @@ public class EmbedData
 
     /// <summary>Nature name.</summary>
     public string? Nature { get; set; }
+
+    /// <summary>Stat Nature name (for minted Natures in PLZA).</summary>
+    public string? StatNature { get; set; }
 
     /// <summary>Displayed Pokémon name (nickname or species).</summary>
     public string? PokemonDisplayName { get; set; }
