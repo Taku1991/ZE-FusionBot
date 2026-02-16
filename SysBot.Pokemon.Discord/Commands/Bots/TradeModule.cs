@@ -404,7 +404,7 @@ public partial class TradeModule<T> : ModuleBase<SocketCommandContext> where T :
             return;
         }
 
-        TradeExtensions<T>.DittoTrade((T)pkm);
+        pkm = TradeExtensions<T>.DittoTrade((T)pkm);
 
         // Apply early AutoOT for cached trainer info
         if (pkm is T dittoPk)
