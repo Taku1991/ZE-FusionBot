@@ -295,7 +295,7 @@ public static class CreatePokemonHelper
         var etaMessage = $"Wait Estimate: {baseEta:F1} min(s) for trade.";
         string footerText = $"Current Queue Position: {(position.Position == -1 ? 1 : position.Position)}";
         footerText += $"\n{etaMessage}";
-        footerText += $"\nZE FusionBot {PokeBot.Version}";
+        footerText += $"\nZE FusionBot for Pokémon Hideout {PokeBot.Version}";
 
         var embedBuilder = new EmbedBuilder()
             .WithColor(embedColor)

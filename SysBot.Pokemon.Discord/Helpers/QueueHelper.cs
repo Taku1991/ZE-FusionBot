@@ -213,7 +213,7 @@ public static class QueueHelper<T> where T : PKM, new()
                 footerText += $"\n{userDetailsText}";
             }
             footerText += $"\n{etaMessage}";
-            footerText += $"\nZE FusionBot {PokeBot.Version}";
+            footerText += $"\nZE FusionBot for Pokémon Hideout {PokeBot.Version}";
 
             var embedBuilder = new EmbedBuilder()
                 .WithColor(embedColor)
