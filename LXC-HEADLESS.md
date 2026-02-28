@@ -1,4 +1,4 @@
-# ZE-FusionBot – LXC Container (Headless, ohne WinForms GUI)
+﻿# ZE-FusionBot – LXC Container (Headless, ohne WinForms GUI)
 
 > Basierend auf Analyse vom 28.02.2026  
 > Ziel: Bot läuft in einem LXC-Container unter Linux ohne WinForms GUI.  
@@ -369,3 +369,381 @@ dotnet publish SysBot.Pokemon.API/SysBot.Pokemon.API.csproj \
   -p:PublishSingleFile=true \
   -o ./publish/linux-x64-api
 ```
+
+
+---
+
+##  LXC-Container Setup  7 Instanzen + SMB/NFS Share
+
+Diese Sektion beschreibt die vollständige Einrichtung eines Proxmox LXC-Containers für den Betrieb von 7 Bot-Instanzen und der Homepage-API.
+
+---
+
+### 1. Ressourcenplanung
+
+| Ressource | Pro Instanz | 7 Instanzen + API | Empfehlung Container |
+|-----------|-------------|-------------------|----------------------|
+| RAM | ~350500 MB | ~34 GB | **6 GB** (mit Luft) |
+| CPU (vCores) | ~0,51 Core | ~47 Cores | **8 vCores** |
+| Disk | ~500 MB | ~4 GB + Logs | **20 GB** |
+| Netzwerk | 1 GbE reicht |  | Bridged `vmbr0` |
+
+> **Hinweis**: Der Speicherbedarf hängt stark von der PKM-Datenbank und den Build-Binaries ab. Lieber großzügig planen.
+
+---
+
+### 2. Proxmox LXC-Container erstellen
+
+Entweder per WebUI oder direkt mit `pct`:
+
+```bash
+# Ubuntu 24.04 LTS Template (pveam list local)
+pct create 112 local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst \
+  --hostname sysbot \
+  --cores 8 \
+  --memory 6144 \
+  --rootfs local-lvm:20 \
+  --net0 name=eth0,bridge=vmbr0,ip=dhcp \
+  --unprivileged 1 \
+  --features nesting=1 \
+  --ostype ubuntu \
+  --start 1
+```
+
+Im Container als `root`:
+
+```bash
+apt update && apt upgrade -y
+apt install -y \
+  libgdiplus \
+  libicu-dev \
+  libssl-dev \
+  ca-certificates \
+  tzdata \
+  cifs-utils \
+  nfs-common \
+  curl wget git
+```
+
+Systemzeit setzen:
+
+```bash
+timedatectl set-timezone Europe/Berlin
+```
+
+Bot-User anlegen (kein Root-Betrieb):
+
+```bash
+useradd -m -s /bin/bash botuser
+```
+
+---
+
+### 3. Verzeichnisstruktur (7 Instanzen)
+
+```
+/opt/zefusionbot/
+ shared/                   SMB/NFS Mount (oder Bind-Mount vom Host)
+    deps/                 PKHeX-DLLs & Ressourcen (geteilt)
+    pkm/                  PKM-Dateien (geteilt, lesen)
+    ports/                ZE_FusionBot_*.port Koordinations-Dateien
+
+ plza-bot/                <- MASTER (startet auch die API)
+    config.json
+    logs/
+    dump/
+ swsh-bot/    pla-bot/    bdsp-bot/    lgpe-bot/    sv-bot/
+    (jeweils config.json, logs/, dump/)
+ felino-bot/
+    config.json
+    logs/
+    dump/
+
+ shared/bin/
+     SysBot.Pokemon.ConsoleApp    <- das eigentliche Binary
+```
+
+Verzeichnisse anlegen:
+
+```bash
+mkdir -p /opt/zefusionbot/shared/{deps,pkm,ports,bin}
+for bot in plza-bot swsh-bot pla-bot bdsp-bot lgpe-bot sv-bot felino-bot; do
+  mkdir -p /opt/zefusionbot/$bot/{logs,dump}
+done
+chown -R botuser:botuser /opt/zefusionbot
+```
+
+---
+
+### 4. SMB / NFS Share einbinden
+
+#### Option A  Proxmox Bind-Mount (empfohlen, kein Netzwerk-Overhead)
+
+Auf dem **Proxmox-Host** ein Verzeichnis anlegen und im LXC als Bind-Mount einbinden.
+
+Auf dem Host:
+
+```bash
+mkdir -p /mnt/pve/sysbot-shared
+# uid/gid 100000 = botuser im unprivilegierten Container
+chown -R 100000:100000 /mnt/pve/sysbot-shared
+```
+
+In `/etc/pve/lxc/112.conf` hinzufügen:
+
+```ini
+mp0: /mnt/pve/sysbot-shared,mp=/opt/zefusionbot/shared
+```
+
+Danach Container neu starten:
+
+```bash
+pct restart 112
+```
+
+#### Option B  SMB / CIFS Share (z. B. Windows-NAS oder Synology)
+
+In `/etc/fstab` im Container:
+
+```
+//nas.local/sysbot-shared  /opt/zefusionbot/shared  cifs  credentials=/etc/sysbot-smb.creds,uid=1000,gid=1000,iocharset=utf8,_netdev  0  0
+```
+
+Credentials-Datei `/etc/sysbot-smb.creds` (chmod 600):
+
+```
+username=botuser
+password=GEHEIMESPASSWORT
+domain=WORKGROUP
+```
+
+Mounten testen:
+
+```bash
+mount -a && df -h /opt/zefusionbot/shared
+```
+
+#### Option C  NFS Share (z. B. TrueNAS / Linux NFS-Server)
+
+In `/etc/fstab` im Container:
+
+```
+nfs.local:/volume1/sysbot-shared  /opt/zefusionbot/shared  nfs4  defaults,_netdev,rw  0  0
+```
+
+Mounten testen:
+
+```bash
+mount -a && df -h /opt/zefusionbot/shared
+```
+
+---
+
+### 5. Port-Planung (7 Instanzen)
+
+**WebServer-Ports (HTTP Steuerungs-Panel)** werden vom Bot **automatisch vergeben** – je nachdem welcher Port frei ist. Diese müssen nicht manuell konfiguriert werden.
+
+Manuell konfiguriert werden nur:
+- **Switch TCP-Port** – Verbindung zur Nintendo Switch (sys-botbase / USB-Botting), in `config.json` unter `Connection.Port`
+- **API-Port** – läuft im PLZA-Bot Prozess auf Port **5000**
+
+| Instanz       | Switch TCP | Beschreibung                      |
+|---------------|------------|-----------------------------------|
+| `plza-bot`    | 6001       | **MASTER** – startet auch die API |
+| `swsh-bot`    | 6002       |                                   |
+| `pla-bot`     | 6003       |                                   |
+| `bdsp-bot`    | 6004       |                                   |
+| `lgpe-bot`    | 6005       |                                   |
+| `sv-bot`      | 6006       |                                   |
+| `felino-bot`  | 6007       |                                   |
+| API           | —          | Port 5000, läuft im PLZA-Bot mit  |
+
+> Um den **tatsächlich vergebenen WebServer-Port** einer Instanz zu sehen:
+> ```bash
+> journalctl -u zefusionbot@plza-bot | grep -i 'webserver\|listening\|http\|port'
+> # oder:
+> ss -tlnp | grep SysBot
+> ```
+
+---
+
+### 6. `config.json` pro Instanz
+
+Jede Instanz bekommt eine eigene `/opt/zefusionbot/<bot-name>/config.json`.
+Das einzige Feld das sich pro Instanz zwingend unterscheiden muss ist die Switch-Verbindung:
+
+```json
+{
+  "Hub": {
+    "WebServer": {
+      "Enabled": true
+    }
+  },
+  "Bots": [
+    {
+      "Connection": {
+        "IP": "192.168.1.10",
+        "Port": 6001
+      }
+    }
+  ]
+}
+```
+
+> `WebServer.Port` muss **nicht** gesetzt werden – der Bot wählt automatisch einen freien Port.
+
+Switch-Verbindungen pro Instanz:
+
+| Bot           | Switch-IP      | Switch `Port` |
+|---------------|----------------|---------------|
+| `plza-bot`    | 192.168.1.10   | 6001          |
+| `swsh-bot`    | 192.168.1.11   | 6001          |
+| `pla-bot`     | 192.168.1.12   | 6001          |
+| `bdsp-bot`    | 192.168.1.13   | 6001          |
+| `lgpe-bot`    | 192.168.1.14   | 6001          |
+| `sv-bot`      | 192.168.1.15   | 6001          |
+| `felino-bot`  | 192.168.1.16   | 6001          |
+
+> IP-Adressen und Ports an die tatsächlichen Switch-Konfigurationen anpassen.
+
+---
+
+### 7. systemd Template-Unit (eine Datei für alle 7 Instanzen)
+
+Template-Datei `/etc/systemd/system/zefusionbot@.service`:
+
+```ini
+[Unit]
+Description=ZE FusionBot  Instanz %i
+After=network-online.target remote-fs.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=botuser
+WorkingDirectory=/opt/zefusionbot/%i
+ExecStart=/opt/zefusionbot/shared/bin/SysBot.Pokemon.ConsoleApp
+Restart=on-failure
+RestartSec=15
+MemoryMax=800M
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zefusionbot-%i
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Aktivieren und starten:
+
+```bash
+systemctl daemon-reload
+
+# Alle 7 Bots aktivieren und starten
+for bot in plza-bot swsh-bot pla-bot bdsp-bot lgpe-bot sv-bot felino-bot; do
+  systemctl enable zefusionbot@$bot
+  systemctl start  zefusionbot@$bot
+done
+
+# Gesamtstatus
+systemctl status 'zefusionbot@*'
+
+# Live-Log eines Bots
+journalctl -u zefusionbot@plza-bot -f
+journalctl -u zefusionbot@swsh-bot -f
+```
+
+> Die API läuft automatisch im PLZA-Bot Prozess mit – kein separater API-Service nötig.
+
+---
+
+### 8. Firewall (ufw)
+
+```bash
+apt install -y ufw
+ufw default deny incoming
+ufw default allow outgoing
+
+# SSH
+ufw allow 22/tcp
+
+# Bot WebServer-Ports werden automatisch vergeben – breiten Bereich aus dem LAN erlauben
+# (NUR intern / VPN, NICHT öffentlich!)
+ufw allow from 192.168.0.0/16 to any port 8000:9000 proto tcp
+
+# Homepage-API (öffentlich oder hinter Reverse Proxy)
+ufw allow 5000/tcp
+
+# Switch-Verbindungsports (nur aus dem VLAN der Switches)
+ufw allow from 192.168.1.0/24 to any port 6001:6007 proto tcp
+
+ufw enable
+ufw status numbered
+```
+
+**Empfehlung**: Die WebServer-Ports nicht direkt ins Internet exponieren – stattdessen Nginx mit HTTPS davor.
+
+Zuerst herausfinden welchen Port der Bot automatisch bekommen hat:
+
+```bash
+ss -tlnp | grep SysBot
+# oder:
+journalctl -u zefusionbot@plza-bot | grep -i 'port\|listen\|http'
+```
+
+Dann in Nginx eintragen (PORT durch den tatsächlich vergebenen Port ersetzen):
+
+```nginx
+# /etc/nginx/sites-available/zefusionbot-plza
+server {
+    listen 443 ssl;
+    server_name plza.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:PORT;   # <-- auto-vergebenen Port eintragen
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+---
+
+### 9. Binary deployen
+
+Build auf dem Entwicklungsrechner, dann übertragen:
+
+```bash
+# Build (Windows-Entwicklungsrechner):
+dotnet publish SysBot.Pokemon.ConsoleApp/SysBot.Pokemon.ConsoleApp.csproj `
+  -c Release `
+  -r linux-x64 `
+  --self-contained true `
+  -p:PublishSingleFile=true `
+  -o ./publish/linux-x64
+
+# Übertragen per scp:
+scp ./publish/linux-x64/SysBot.Pokemon.ConsoleApp botuser@lxc-ip:/opt/zefusionbot/shared/bin/
+ssh botuser@lxc-ip "chmod +x /opt/zefusionbot/shared/bin/SysBot.Pokemon.ConsoleApp"
+```
+
+Alle 7 Instanzen nutzen dann dasselbe Binary über den gemeinsamen Pfad 
+kein Kopieren in jede Instanz nötig.
+
+---
+
+### 10. Checkliste vor dem ersten Start
+
+- [ ] Container läuft, `botuser` existiert (`id botuser`)
+- [ ] `libgdiplus` installiert (`dpkg -l libgdiplus`)
+- [ ] Share gemountet und beschreibbar (`df -h /opt/zefusionbot/shared && touch /opt/zefusionbot/shared/test`)
+- [ ] 7× `config.json` vorhanden (plza-bot, swsh-bot, pla-bot, bdsp-bot, lgpe-bot, sv-bot, felino-bot), jeweils mit korrekter Switch-IP/Port
+- [ ] Binary vorhanden und `+x` gesetzt (`ls -la /opt/zefusionbot/shared/bin/`)
+- [ ] systemd Units geladen (`systemctl daemon-reload`)
+- [ ] Alle 7 Services gestartet (`systemctl status 'zefusionbot@*'`)
+- [ ] API läuft im PLZA-Bot Prozess (`journalctl -u zefusionbot@plza-bot | grep -i api`)
+- [ ] Firewall aktiv (`ufw status`)
+- [ ] Logs ohne Fehler (`journalctl -u zefusionbot@plza-bot --since "2 min ago"`)

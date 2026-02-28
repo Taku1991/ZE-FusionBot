@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SysBot.Base;
 using SysBot.Pokemon.Helpers;
+using SysBot.Pokemon.ConsoleApp.API;
 using SysBot.Pokemon.ConsoleApp.WebApi;
 using static SysBot.Pokemon.ConsoleApp.WebApi.RestartManager;
 
@@ -22,6 +23,7 @@ public static class WebApiExtensions
     private static CancellationTokenSource? _cts;
     private static CancellationTokenSource? _monitorCts;
     private static IBotHost? _host;
+    private static ApiHost? _apiHost;
 
     private static int _webPort = 8080; // Will be set from config
     private static int _tcpPort = 0;
@@ -37,6 +39,11 @@ public static class WebApiExtensions
     /// Get the current TCP port for this bot instance
     /// </summary>
     public static int GetCurrentTcpPort() => _tcpPort;
+
+    /// <summary>
+    /// Check if this bot instance is running the REST API server (Master).
+    /// </summary>
+    public static bool HasRestApiServer() => _apiHost != null;
 
     public static void InitWebServer(IBotHost host)
     {
@@ -288,11 +295,43 @@ public static class WebApiExtensions
 
     private static void StartTcpOnly()
     {
+        // Initialize TradeHubService so TCP-routed trades can be processed
+        if (_host != null)
+            SysBot.Pokemon.ConsoleApp.API.Services.TradeHubService.Initialize(_host);
+
         StartTcp();
 
         // Slaves no longer need their own web server - logs are read directly from file by master
 
         CreatePortFile();
+    }
+
+    private static void StartRestAPI()
+    {
+        try
+        {
+            if (_host?.Config?.Hub?.WebServer == null || !_host.Config.Hub.WebServer.EnableRestAPI)
+            {
+                LogUtil.LogInfo("REST API is disabled in settings.", "ApiHost");
+                return;
+            }
+
+            var apiPort = _host.Config.Hub.WebServer.RestAPIPort;
+            var corsOrigins = _host.Config.Hub.WebServer.CorsOrigins;
+
+            var origins = string.IsNullOrWhiteSpace(corsOrigins)
+                ? new[] { "http://localhost:3000" }
+                : corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(o => o.Trim())
+                    .ToArray();
+
+            _apiHost = new ApiHost(apiPort, origins);
+            _apiHost.Start();
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to start REST API: {ex.Message}", "ApiHost");
+        }
     }
 
     private static void StartFullServer()
@@ -304,8 +343,12 @@ public static class WebApiExtensions
             StartTcp();
             CreatePortFile();
 
-            // Initialize TradeEndpoints with the host
+            // Initialize TradeEndpoints and TradeHubService with the host
             TradeEndpoints.Initialize(_host!);
+            SysBot.Pokemon.ConsoleApp.API.Services.TradeHubService.Initialize(_host!);
+
+            // Start REST API with SignalR
+            StartRestAPI();
         }
         catch (Exception ex) when (ex.Message.Contains("conflicts with an existing registration"))
         {
@@ -483,8 +526,63 @@ public static class WebApiExtensions
             "RESTARTSCHEDULE" => GetRestartSchedule(),
             "REMOTE_BUTTON" => HandleRemoteButton(parts),
             "REMOTE_MACRO" => HandleRemoteMacro(parts),
+            "SUBMIT_TRADE" => HandleSubmitTrade(command),
+            "GET_STATUS" => HandleGetStatus(command),
             _ => $"ERROR: Unknown command '{cmd}'"
         };
+    }
+
+    private static string HandleSubmitTrade(string command)
+    {
+        try
+        {
+            var colonIndex = command.IndexOf(':');
+            if (colonIndex == -1 || colonIndex == command.Length - 1)
+            {
+                LogUtil.LogError("Invalid SUBMIT_TRADE format", "WebApiExtensions");
+                return "ERROR: Invalid SUBMIT_TRADE format. Expected SUBMIT_TRADE:{JSON}";
+            }
+
+            var json = command.Substring(colonIndex + 1);
+            var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var request = System.Text.Json.JsonSerializer.Deserialize<SysBot.Pokemon.ConsoleApp.API.Models.TradeRequest>(json, options);
+            if (request == null)
+                return "ERROR: Failed to deserialize TradeRequest";
+
+            var response = SysBot.Pokemon.ConsoleApp.API.Services.TradeHubService.ProcessTradeDirectlyAsync(request).Result;
+            return System.Text.Json.JsonSerializer.Serialize(response);
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to handle SUBMIT_TRADE: {ex.Message}", "WebApiExtensions");
+            return $"ERROR: {ex.Message}";
+        }
+    }
+
+    private static string HandleGetStatus(string command)
+    {
+        try
+        {
+            var colonIndex = command.IndexOf(':');
+            if (colonIndex == -1 || colonIndex == command.Length - 1)
+            {
+                LogUtil.LogError("Invalid GET_STATUS format", "WebApiExtensions");
+                return "ERROR: Invalid GET_STATUS format. Expected GET_STATUS:{tradeId}";
+            }
+
+            var tradeId = command.Substring(colonIndex + 1);
+            var status = SysBot.Pokemon.ConsoleApp.API.Services.TradeHubService.GetTradeStatusDirectlyAsync(tradeId).Result;
+
+            if (status == null)
+                return "ERROR: Trade not found";
+
+            return System.Text.Json.JsonSerializer.Serialize(status);
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to handle GET_STATUS: {ex.Message}", "WebApiExtensions");
+            return $"ERROR: {ex.Message}";
+        }
     }
 
     private static volatile bool _updateInProgress = false;
@@ -1114,6 +1212,8 @@ rm -f '$0'
             _cts?.Cancel();
             _tcp?.Stop();
             _server?.Dispose();
+            _apiHost?.Dispose();
+            _apiHost = null;
             RestartManager.Shutdown();
 
             // Release the port reservations

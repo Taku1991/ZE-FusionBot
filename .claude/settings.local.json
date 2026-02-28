@@ -6,7 +6,16 @@
       "Bash(dotnet clean:*)",
       "Bash(git add:*)",
       "Bash(paste:*)",
-      "Bash(dotnet publish:*)"
+      "Bash(dotnet publish:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(tar:*)",
+      "Bash(xargs grep:*)",
+      "Bash(ls:*)",
+      "Bash(python:*)",
+      "Bash(do:*)",
+      "Bash(python3:*)",
+      "Bash(PYTHONIOENCODING=utf-8 python3:*)"
     ]
   }
 }

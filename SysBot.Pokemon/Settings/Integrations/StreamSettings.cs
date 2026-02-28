@@ -13,7 +13,7 @@ public class StreamSettings
 {
     private const string Operation = nameof(Operation);
 
-    private static readonly byte[] BlackPixel = // 1x1 black pixel
+    public static readonly byte[] BlackPixel = // 1x1 black pixel
     [
         0x42, 0x4D, 0x3A, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x36, 0x00, 0x00, 0x00, 0x28, 0x00,

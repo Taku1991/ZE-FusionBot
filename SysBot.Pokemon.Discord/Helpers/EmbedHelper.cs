@@ -5,6 +5,8 @@ using SysBot.Base;
 using SysBot.Pokemon.Helpers;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,6 +19,27 @@ public static class EmbedHelper
     private static readonly ConcurrentDictionary<ulong, IDMChannel> _dmChannels = new();
     private static DateTime _lastDmTime = DateTime.MinValue;
     private const int MinDmDelayMs = 2000; // Minimum 2 seconds between DMs
+
+    // Pictocodes → National Pokédex number mapping (for PokeAPI sprite URLs)
+    private static readonly Dictionary<Pictocodes, int> PictocodeSpeciesId = new()
+    {
+        [Pictocodes.Pikachu]   = 25,
+        [Pictocodes.Eevee]     = 133,
+        [Pictocodes.Bulbasaur] = 1,
+        [Pictocodes.Charmander]= 4,
+        [Pictocodes.Squirtle]  = 7,
+        [Pictocodes.Pidgey]    = 16,
+        [Pictocodes.Caterpie]  = 10,
+        [Pictocodes.Rattata]   = 19,
+        [Pictocodes.Jigglypuff]= 39,
+        [Pictocodes.Diglett]   = 50,
+    };
+
+    private static string PictocodeSprite(Pictocodes code)
+    {
+        int id = PictocodeSpeciesId.TryGetValue(code, out int n) ? n : 0;
+        return $"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{id}.png";
+    }
 
     private static async Task<IDMChannel?> GetOrCreateDMAsync(IUser user)
     {
@@ -228,6 +251,106 @@ public static class EmbedHelper
         catch (Exception ex)
         {
             LogUtil.LogError($"Error sending trade finished embed: {ex.Message}", "SendTradeFinishedEmbedAsync");
+        }
+    }
+
+    public static async Task SendLGTradeCodeEmbedAsync(IUser user, List<Pictocodes> lgcode)
+    {
+        await _dmRateLimiter.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var dm = await GetOrCreateDMAsync(user).ConfigureAwait(false);
+            if (dm == null)
+            {
+                LogUtil.LogError($"Could not create DM channel for user {user.Username} ({user.Id}). Skipping LG trade code message.", "SendLGTradeCodeEmbedAsync");
+                return;
+            }
+
+            string thumbnailUrl = lgcode.Count > 0 ? PictocodeSprite(lgcode[0]) : "";
+            var lines = lgcode.Select((c, i) =>
+                $"**{i + 1}.** [{c}]({PictocodeSprite(c)})");
+            string description = string.Join("\n", lines)
+                + "\n\n*Enter these 3 Pokémon pictures in order in your Link Trade!*\n*I'll notify you when your trade starts!*";
+
+            var embed = new EmbedBuilder()
+                .WithTitle("Here's your Pictocode!")
+                .WithDescription(description)
+                .WithTimestamp(DateTimeOffset.Now)
+                .WithThumbnailUrl(thumbnailUrl)
+                .WithColor(Color.Gold)
+                .Build();
+
+            await dm.SendMessageAsync(embed: embed).ConfigureAwait(false);
+            _lastDmTime = DateTime.Now;
+        }
+        catch (ObjectDisposedException)
+        {
+            LogUtil.LogError("Discord client disposed when sending LG trade code embed.", "SendLGTradeCodeEmbedAsync");
+        }
+        catch (HttpException ex) when (ex.DiscordCode.HasValue && ex.DiscordCode.Value == (DiscordErrorCode)40003)
+        {
+            LogUtil.LogError($"Opening DMs too fast! User: {user.Username} ({user.Id})", "SendLGTradeCodeEmbedAsync");
+            _dmChannels.TryRemove(user.Id, out _);
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Error sending LG trade code embed: {ex.Message}", "SendLGTradeCodeEmbedAsync");
+        }
+        finally
+        {
+            _dmRateLimiter.Release();
+        }
+    }
+
+    public static async Task SendTradeInitializingEmbedAsync(IUser user, string speciesName, string codeText, bool isMysteryEgg, string? message = null)
+    {
+        await _dmRateLimiter.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var dm = await GetOrCreateDMAsync(user).ConfigureAwait(false);
+            if (dm == null)
+            {
+                LogUtil.LogError($"Could not create DM channel for user {user.Username} ({user.Id}). Skipping trade initializing message.", "SendTradeInitializingEmbedAsync");
+                return;
+            }
+
+            if (isMysteryEgg)
+            {
+                speciesName = "**Mystery Egg**";
+            }
+
+            var embed = new EmbedBuilder()
+                .WithTitle("Loading the Trade Menu...")
+                .WithDescription($"**Pokemon**: {speciesName}\n**Pictocode**: {codeText}")
+                .WithTimestamp(DateTimeOffset.Now)
+                .WithThumbnailUrl("https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/dm-initializingbot.gif")
+                .WithColor(Color.Green);
+
+            if (!string.IsNullOrEmpty(message))
+            {
+                embed.WithDescription($"{embed.Description}\n\n{message}");
+            }
+
+            var builtEmbed = embed.Build();
+            await dm.SendMessageAsync(embed: builtEmbed).ConfigureAwait(false);
+            _lastDmTime = DateTime.Now;
+        }
+        catch (ObjectDisposedException)
+        {
+            LogUtil.LogError("Discord client disposed when sending trade initializing embed.", "SendTradeInitializingEmbedAsync");
+        }
+        catch (HttpException ex) when (ex.DiscordCode.HasValue && ex.DiscordCode.Value == (DiscordErrorCode)40003)
+        {
+            LogUtil.LogError($"Opening DMs too fast! User: {user.Username} ({user.Id})", "SendTradeInitializingEmbedAsync");
+            _dmChannels.TryRemove(user.Id, out _);
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Error sending trade initializing embed: {ex.Message}", "SendTradeInitializingEmbedAsync");
+        }
+        finally
+        {
+            _dmRateLimiter.Release();
         }
     }
 

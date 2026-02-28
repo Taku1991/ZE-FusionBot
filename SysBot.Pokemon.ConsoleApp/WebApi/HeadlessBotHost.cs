@@ -34,6 +34,8 @@ public class HeadlessBotHost : IBotHost
     public IReadOnlyList<BotSource<PokeBotState>> GetBotSources() =>
         _runner.Bots.ToList().AsReadOnly();
 
+    public IPokeBotRunner GetBotRunner() => _runner;
+
     public void SendAll(BotControlCommand cmd)
     {
         _runner.InitializeStart();

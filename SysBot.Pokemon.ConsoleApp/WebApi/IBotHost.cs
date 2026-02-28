@@ -16,4 +16,9 @@ public interface IBotHost
     void SendAll(BotControlCommand command);
     void PerformRestart();
     void PerformExit();
+
+    /// <summary>
+    /// Returns the underlying bot runner (IPokeBotRunner) for direct hub/queue access.
+    /// </summary>
+    IPokeBotRunner GetBotRunner();
 }

@@ -4,17 +4,13 @@ using Discord.Net;
 using Discord.WebSocket;
 using PKHeX.Core;
 using PKHeX.Core.AutoMod;
-using PKHeX.Drawing.PokeSprite;
 using SysBot.Pokemon.Discord.Commands.Bots;
 using SysBot.Pokemon.Helpers;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Threading.Tasks;
-using Color = System.Drawing.Color;
 using DiscordColor = Discord.Color;
 
 namespace SysBot.Pokemon.Discord;
@@ -80,8 +76,9 @@ public static class QueueHelper<T> where T : PKM, new()
             {
                 if (trade is PB7 && lgcode != null)
                 {
-                    var (thefile, lgcodeembed) = CreateLGLinkCodeSpriteEmbed(lgcode);
-                    await trader.SendFileAsync(thefile, "Your trade code will be.", embed: lgcodeembed).ConfigureAwait(false);
+                    var (lgfile, lgEmbed) = await SkiaImageHelper.CreateLGCodeSpriteAsync(lgcode).ConfigureAwait(false);
+                    await trader.SendFileAsync(lgfile, "Your trade code will be.", embed: lgEmbed).ConfigureAwait(false);
+                    await ScheduleFileDeletion(lgfile, 5000).ConfigureAwait(false);
                 }
                 else
                 {
@@ -397,8 +394,8 @@ public static class QueueHelper<T> where T : PKM, new()
         {
             try
             {
-                // Create combined sprite image
-                string spriteImagePath = CreateBatchSpriteImage(allTrades);
+                // Create combined sprite image (cross-platform via SkiaSharp)
+                string spriteImagePath = await SkiaImageHelper.CreateBatchSpriteAsync(allTrades).ConfigureAwait(false);
 
                 // Build Pokemon list for description
                 var pokemonList = new System.Text.StringBuilder();
@@ -457,7 +454,7 @@ public static class QueueHelper<T> where T : PKM, new()
                 await context.Channel.SendFileAsync(spriteImagePath, embed: embed);
 
                 // Schedule cleanup of temporary sprite image
-                await ScheduleFileDeletion(spriteImagePath, 5);
+                await ScheduleFileDeletion(spriteImagePath, 5000);
             }
             catch (HttpException ex)
             {
@@ -485,209 +482,62 @@ public static class QueueHelper<T> where T : PKM, new()
         return (int)((timestamp % int.MaxValue) * 1000 + randomValue);
     }
 
-    private static string GetImageFolderPath()
-    {
-        string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        string imagesFolder = Path.Combine(baseDirectory, "Images");
-
-        if (!Directory.Exists(imagesFolder))
-        {
-            Directory.CreateDirectory(imagesFolder);
-        }
-
-        return imagesFolder;
-    }
-
-    private static string SaveImageLocally(System.Drawing.Image image)
-    {
-        string imagesFolderPath = GetImageFolderPath();
-        string filePath = Path.Combine(imagesFolderPath, $"image_{Guid.NewGuid()}.png");
-
-#pragma warning disable CA1416 // Validate platform compatibility
-        image.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
-#pragma warning restore CA1416 // Validate platform compatibility
-
-        return filePath;
-    }
-
     public static async Task<(string, DiscordColor)> PrepareEmbedDetails(T pk)
     {
-        string embedImageUrl;
-        string speciesImageUrl;
+        try
+        {
+            return await PrepareEmbedDetailsCore(pk).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"PrepareEmbedDetails fallback: {ex.Message}");
+            bool canGmax = pk is PK8 pk8 && pk8.CanGigantamax;
+            string fallbackUrl = TradeExtensions<T>.PokeImg(pk, canGmax, pk.IsEgg, null);
+            return (fallbackUrl, new DiscordColor(255, 255, 255));
+        }
+    }
 
+    private static async Task<(string, DiscordColor)> PrepareEmbedDetailsCore(T pk)
+    {
+        // Build ball URL
+        var strings = GameInfo.GetStrings("en");
+        string ballName = strings.balllist[pk.Ball];
+        ballName = ballName.Contains("(LA)")
+            ? "la" + ballName.Replace(" ", "").Replace("(LA)", "").ToLower()
+            : ballName.Replace(" ", "").ToLower();
+        string ballImgUrl = $"https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/AltBallImg/20x20/{ballName}.png";
+
+        // Load base species bitmap (egg composite or plain sprite)
+        SkiaSharp.SKBitmap? speciesBmp;
         if (pk.IsEgg)
         {
-            string eggImageUrl = GetEggTypeImageUrl(pk);
-            speciesImageUrl = TradeExtensions<T>.PokeImg(pk, false, true, null);
-            System.Drawing.Image combinedImage = await OverlaySpeciesOnEgg(eggImageUrl, speciesImageUrl);
-            embedImageUrl = SaveImageLocally(combinedImage);
+            string eggUrl = GetEggTypeImageUrl(pk);
+            string speciesUrl = TradeExtensions<T>.PokeImg(pk, false, true, null);
+            speciesBmp = await SkiaImageHelper.CompositeEggWithSpeciesAsync(eggUrl, speciesUrl).ConfigureAwait(false);
         }
         else
         {
             bool canGmax = pk is PK8 pk8 && pk8.CanGigantamax;
-            speciesImageUrl = TradeExtensions<T>.PokeImg(pk, canGmax, false, SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.PreferredImageSize);
-            embedImageUrl = speciesImageUrl;
+            string speciesUrl = TradeExtensions<T>.PokeImg(pk, canGmax, false, SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.PreferredImageSize);
+            speciesBmp = await SkiaImageHelper.LoadFromUrlAsync(speciesUrl).ConfigureAwait(false);
         }
 
-        var strings = GameInfo.GetStrings("en");
-        string ballName = strings.balllist[pk.Ball];
-        if (ballName.Contains("(LA)"))
+        if (speciesBmp == null)
         {
-            ballName = "la" + ballName.Replace(" ", "").Replace("(LA)", "").ToLower();
-        }
-        else
-        {
-            ballName = ballName.Replace(" ", "").ToLower();
+            bool canGmax = pk is PK8 pk8b && pk8b.CanGigantamax;
+            return (TradeExtensions<T>.PokeImg(pk, canGmax, pk.IsEgg, null), new DiscordColor(255, 255, 255));
         }
 
-        string ballImgUrl = $"https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/AltBallImg/20x20/{ballName}.png";
+        // Overlay ball (bottom-right corner)
+        var withBall = await SkiaImageHelper.OverlayBallAsync(speciesBmp, ballImgUrl).ConfigureAwait(false);
+        speciesBmp.Dispose();
 
-        if (Uri.TryCreate(embedImageUrl, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeFile)
-        {
-#pragma warning disable CA1416 // Validate platform compatibility
-            using var localImage = await Task.Run(() => System.Drawing.Image.FromFile(uri.LocalPath));
-#pragma warning restore CA1416 // Validate platform compatibility
-            using var ballImage = await LoadImageFromUrl(ballImgUrl);
-            if (ballImage != null)
-            {
-#pragma warning disable CA1416 // Validate platform compatibility
-                using (var graphics = Graphics.FromImage(localImage))
-                {
-                    var ballPosition = new Point(localImage.Width - ballImage.Width, localImage.Height - ballImage.Height);
-                    graphics.DrawImage(ballImage, ballPosition);
-                }
-#pragma warning restore CA1416 // Validate platform compatibility
-                embedImageUrl = SaveImageLocally(localImage);
-            }
-        }
-        else
-        {
-            (System.Drawing.Image? finalCombinedImage, bool ballImageLoaded) = await OverlayBallOnSpecies(speciesImageUrl, ballImgUrl);
-            if (finalCombinedImage != null)
-            {
-                embedImageUrl = SaveImageLocally(finalCombinedImage);
-            }
-            else
-            {
-                // Fall back to species image if overlay failed
-                embedImageUrl = speciesImageUrl;
-            }
+        // Compute dominant colour, then save to a local file
+        var (r, g, b) = SkiaImageHelper.GetDominantColor(withBall);
+        string path = SkiaImageHelper.SaveToFile(withBall);
+        withBall.Dispose();
 
-            if (!ballImageLoaded)
-            {
-                Console.WriteLine($"Ball image could not be loaded: {ballImgUrl}");
-            }
-        }
-
-        (int R, int G, int B) = await GetDominantColorAsync(embedImageUrl);
-        return (embedImageUrl, new DiscordColor(R, G, B));
-    }
-
-    private static async Task<(System.Drawing.Image?, bool)> OverlayBallOnSpecies(string speciesImageUrl, string ballImageUrl)
-    {
-        using var speciesImage = await LoadImageFromUrl(speciesImageUrl);
-        if (speciesImage == null)
-        {
-            Console.WriteLine("Species image could not be loaded.");
-            return (null, false);
-        }
-
-        var ballImage = await LoadImageFromUrl(ballImageUrl);
-        if (ballImage == null)
-        {
-            Console.WriteLine($"Ball image could not be loaded: {ballImageUrl}");
-#pragma warning disable CA1416 // Validate platform compatibility
-            return ((System.Drawing.Image)speciesImage.Clone(), false);
-#pragma warning restore CA1416 // Validate platform compatibility
-        }
-
-        using (ballImage)
-        {
-#pragma warning disable CA1416 // Validate platform compatibility
-            using (var graphics = Graphics.FromImage(speciesImage))
-            {
-                var ballPosition = new Point(speciesImage.Width - ballImage.Width, speciesImage.Height - ballImage.Height);
-                graphics.DrawImage(ballImage, ballPosition);
-            }
-#pragma warning restore CA1416 // Validate platform compatibility
-
-#pragma warning disable CA1416 // Validate platform compatibility
-            return ((System.Drawing.Image)speciesImage.Clone(), true);
-#pragma warning restore CA1416 // Validate platform compatibility
-        }
-    }
-
-    private static async Task<System.Drawing.Image> OverlaySpeciesOnEgg(string eggImageUrl, string speciesImageUrl)
-    {
-        System.Drawing.Image? eggImage = await LoadImageFromUrl(eggImageUrl);
-        System.Drawing.Image? speciesImage = await LoadImageFromUrl(speciesImageUrl);
-        
-        if (eggImage == null || speciesImage == null)
-        {
-            throw new InvalidOperationException("Failed to load egg or species image.");
-        }
-
-#pragma warning disable CA1416 // Validate platform compatibility
-        double scaleRatio = Math.Min((double)eggImage.Width / speciesImage.Width, (double)eggImage.Height / speciesImage.Height);
-        Size newSize = new((int)(speciesImage.Width * scaleRatio), (int)(speciesImage.Height * scaleRatio));
-        System.Drawing.Image resizedSpeciesImage = new Bitmap(speciesImage, newSize);
-
-        using (Graphics g = Graphics.FromImage(eggImage))
-        {
-            int speciesX = (eggImage.Width - resizedSpeciesImage.Width) / 2;
-            int speciesY = (eggImage.Height - resizedSpeciesImage.Height) / 2;
-            g.DrawImage(resizedSpeciesImage, speciesX, speciesY, resizedSpeciesImage.Width, resizedSpeciesImage.Height);
-        }
-
-        speciesImage.Dispose();
-        resizedSpeciesImage.Dispose();
-
-        double scale = Math.Min(128.0 / eggImage.Width, 128.0 / eggImage.Height);
-        int newWidth = (int)(eggImage.Width * scale);
-        int newHeight = (int)(eggImage.Height * scale);
-
-        Bitmap finalImage = new(128, 128);
-
-        using (Graphics g = Graphics.FromImage(finalImage))
-        {
-            int x = (128 - newWidth) / 2;
-            int y = (128 - newHeight) / 2;
-            g.DrawImage(eggImage, x, y, newWidth, newHeight);
-        }
-
-        eggImage.Dispose();
-#pragma warning restore CA1416 // Validate platform compatibility
-        return finalImage;
-    }
-
-    private static async Task<System.Drawing.Image?> LoadImageFromUrl(string url)
-    {
-        using HttpClient client = new();
-        HttpResponseMessage response = await client.GetAsync(url);
-        if (!response.IsSuccessStatusCode)
-        {
-            Console.WriteLine($"Failed to load image from {url}. Status code: {response.StatusCode}");
-            return null;
-        }
-
-        Stream stream = await response.Content.ReadAsStreamAsync();
-        if (stream == null || stream.Length == 0)
-        {
-            Console.WriteLine($"No data or empty stream received from {url}");
-            return null;
-        }
-
-        try
-        {
-#pragma warning disable CA1416 // Validate platform compatibility
-            return System.Drawing.Image.FromStream(stream);
-#pragma warning restore CA1416 // Validate platform compatibility
-        }
-        catch (ArgumentException ex)
-        {
-            Console.WriteLine($"Failed to create image from stream. URL: {url}, Exception: {ex}");
-            return null;
-        }
+        return (path, new DiscordColor(r, g, b));
     }
 
     public static async Task ScheduleFileDeletion(string filePath, int delayInMilliseconds)
@@ -723,81 +573,6 @@ public static class QueueHelper<T> where T : PKM, new()
                 .Build();
 
             await channel.SendMessageAsync(embed: embed).ConfigureAwait(false);
-        }
-    }
-
-    public static async Task<(int R, int G, int B)> GetDominantColorAsync(string imagePath)
-    {
-        try
-        {
-            Bitmap image = await LoadImageAsync(imagePath);
-
-            var colorCount = new Dictionary<Color, int>();
-#pragma warning disable CA1416 // Validate platform compatibility
-            await Task.Run(() =>
-            {
-                for (int y = 0; y < image.Height; y++)
-                {
-                    for (int x = 0; x < image.Width; x++)
-                    {
-                        var pixelColor = image.GetPixel(x, y);
-
-                        if (pixelColor.A < 128 || pixelColor.GetBrightness() > 0.9) continue;
-
-                        var brightnessFactor = (int)(pixelColor.GetBrightness() * 100);
-                        var saturationFactor = (int)(pixelColor.GetSaturation() * 100);
-                        var combinedFactor = brightnessFactor + saturationFactor;
-
-                        var quantizedColor = Color.FromArgb(
-                            pixelColor.R / 10 * 10,
-                            pixelColor.G / 10 * 10,
-                            pixelColor.B / 10 * 10
-                        );
-
-                        if (colorCount.ContainsKey(quantizedColor))
-                        {
-                            colorCount[quantizedColor] += combinedFactor;
-                        }
-                        else
-                        {
-                            colorCount[quantizedColor] = combinedFactor;
-                        }
-                    }
-                }
-            });
-
-            image.Dispose();
-#pragma warning restore CA1416 // Validate platform compatibility
-
-            if (colorCount.Count == 0)
-                return (255, 255, 255);
-
-            var dominantColor = colorCount.Aggregate((a, b) => a.Value > b.Value ? a : b).Key;
-            return (dominantColor.R, dominantColor.G, dominantColor.B);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error processing image from {imagePath}. Error: {ex.Message}");
-            return (255, 255, 255);
-        }
-    }
-
-    private static async Task<Bitmap> LoadImageAsync(string imagePath)
-    {
-        if (imagePath.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-        {
-            using var httpClient = new HttpClient();
-            using var response = await httpClient.GetAsync(imagePath);
-            await using var stream = await response.Content.ReadAsStreamAsync();
-#pragma warning disable CA1416 // Validate platform compatibility
-            return new Bitmap(stream);
-#pragma warning restore CA1416 // Validate platform compatibility
-        }
-        else
-        {
-#pragma warning disable CA1416 // Validate platform compatibility
-            return new Bitmap(imagePath);
-#pragma warning restore CA1416 // Validate platform compatibility
         }
     }
 
@@ -857,103 +632,5 @@ public static class QueueHelper<T> where T : PKM, new()
         return $"https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/Eggs/Egg_{typeName}.png";
     }
 
-    public static (string, Embed) CreateLGLinkCodeSpriteEmbed(List<Pictocodes> lgcode)
-    {
-        int codecount = 0;
-        List<System.Drawing.Image> spritearray = [];
-        foreach (Pictocodes cd in lgcode)
-        {
-            var showdown = new ShowdownSet(cd.ToString());
-            var sav = BlankSaveFile.Get(EntityContext.Gen7b, "pip");
-            PKM pk = sav.GetLegalFromSet(showdown).Created;
-#pragma warning disable CA1416 // Validate platform compatibility
-            System.Drawing.Image png = pk.Sprite();
-            var destRect = new Rectangle(-40, -65, 137, 130);
-            var destImage = new Bitmap(137, 130);
-
-            destImage.SetResolution(png.HorizontalResolution, png.VerticalResolution);
-
-            using (var graphics = Graphics.FromImage(destImage))
-            {
-                graphics.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
-                graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
-                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
-                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-                graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-                graphics.DrawImage(png, destRect, 0, 0, png.Width, png.Height, GraphicsUnit.Pixel);
-            }
-            png = destImage;
-            spritearray.Add(png);
-#pragma warning restore CA1416 // Validate platform compatibility
-            codecount++;
-        }
-
-#pragma warning disable CA1416 // Validate platform compatibility
-        int outputImageWidth = spritearray[0].Width + 20;
-        int outputImageHeight = spritearray[0].Height - 65;
-
-        Bitmap outputImage = new(outputImageWidth, outputImageHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-
-        using (Graphics graphics = Graphics.FromImage(outputImage))
-        {
-            graphics.DrawImage(spritearray[0], new Rectangle(0, 0, spritearray[0].Width, spritearray[0].Height),
-                new Rectangle(new Point(), spritearray[0].Size), GraphicsUnit.Pixel);
-            graphics.DrawImage(spritearray[1], new Rectangle(50, 0, spritearray[1].Width, spritearray[1].Height),
-                new Rectangle(new Point(), spritearray[1].Size), GraphicsUnit.Pixel);
-            graphics.DrawImage(spritearray[2], new Rectangle(100, 0, spritearray[2].Width, spritearray[2].Height),
-                new Rectangle(new Point(), spritearray[2].Size), GraphicsUnit.Pixel);
-        }
-
-        System.Drawing.Image finalembedpic = outputImage;
-        var filename = $"{Directory.GetCurrentDirectory()}//finalcode.png";
-        finalembedpic.Save(filename);
-#pragma warning restore CA1416 // Validate platform compatibility
-
-        filename = Path.GetFileName($"{Directory.GetCurrentDirectory()}//finalcode.png");
-        Embed returnembed = new EmbedBuilder().WithTitle($"{lgcode[0]}, {lgcode[1]}, {lgcode[2]}").WithImageUrl($"attachment://{filename}").Build();
-        return (filename, returnembed);
-    }
-
-    /// <summary>
-    /// Creates a combined sprite image for batch trades showing all Pokemon side by side
-    /// </summary>
-    private static string CreateBatchSpriteImage<T>(List<T> pokemonList) where T : PKM, new()
-    {
-#pragma warning disable CA1416 // Validate platform compatibility
-        const int spriteWidth = 91;  // Width for each Pokemon sprite
-        const int spriteHeight = 75; // Height for each Pokemon sprite
-        const int spacing = 3;       // Spacing between sprites
-
-        int totalWidth = (pokemonList.Count * spriteWidth) + ((pokemonList.Count - 1) * spacing);
-        int totalHeight = spriteHeight;
-
-        Bitmap combinedImage = new(totalWidth, totalHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-
-        using (Graphics graphics = Graphics.FromImage(combinedImage))
-        {
-            graphics.Clear(System.Drawing.Color.Transparent);
-            graphics.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceOver;
-            graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
-            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-            graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
-
-            for (int i = 0; i < pokemonList.Count; i++)
-            {
-                var pk = pokemonList[i];
-                var sprite = pk.Sprite();
-
-                int xPosition = i * (spriteWidth + spacing);
-                graphics.DrawImage(sprite, new Rectangle(xPosition, 0, spriteWidth, spriteHeight));
-                sprite.Dispose();
-            }
-        }
-
-        var filename = Path.Combine(Directory.GetCurrentDirectory(), $"batch_trade_{DateTime.Now.Ticks}.png");
-        combinedImage.Save(filename, System.Drawing.Imaging.ImageFormat.Png);
-        combinedImage.Dispose();
-#pragma warning restore CA1416 // Validate platform compatibility
-
-        return filename;
-    }
 }
+
