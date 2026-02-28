@@ -4,9 +4,10 @@ using SysBot.Pokemon.Discord.Helpers;
 using SysBot.Pokemon.Z3;
 using System;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SysBot.Pokemon.ConsoleApp;
 
@@ -25,11 +26,10 @@ public static class Program
         File.WriteAllText(ConfigPath, created);
         LogUtil.LogInfo("SysBot", "Created new config file since none was found in the program's path. Please configure it and restart the program.");
         LogUtil.LogInfo("SysBot", "It is suggested to configure this config file using the GUI project if possible, as it will help you assign values correctly.");
-        LogUtil.LogInfo("SysBot", "Press any key to exit.");
-        Console.ReadKey();
+        Environment.Exit(1);
     }
 
-    private static void Main(string[] args)
+    private static async Task Main(string[] args)
     {
         LogUtil.LogInfo("SysBot", "Starting up...");
         if (args.Length > 1)
@@ -46,19 +46,20 @@ public static class Program
             var lines = File.ReadAllText(ConfigPath);
             var cfg = JsonSerializer.Deserialize<ProgramConfig>(lines) ?? new ProgramConfig();
             PokeTradeBotSWSH.SeedChecker = new Z3SeedSearchHandler<PK8>();
-            BotContainer.RunBots(cfg);
+            await BotContainer.RunBots(cfg);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            LogUtil.LogInfo("SysBot", "Unable to start bots with saved config file. Please copy your config from the WinForms project or delete it and reconfigure.");
-            Console.ReadKey();
+            LogUtil.LogInfo("SysBot", $"Unable to start bots with saved config file: {ex.Message}");
+            LogUtil.LogInfo("SysBot", "Please copy your config from the WinForms project or delete it and reconfigure.");
+            Environment.Exit(1);
         }
     }
 }
 
 public static class BotContainer
 {
-    public static void RunBots(ProgramConfig prog)
+    public static async Task RunBots(ProgramConfig prog)
     {
         // Set the current game mode for BatchCommandNormalizer
         BatchCommandNormalizer.CurrentGameMode = prog.Mode;
@@ -74,8 +75,20 @@ public static class BotContainer
         LogUtil.Forwarders.Add(ConsoleForwarder.Instance);
         env.StartAll();
         LogUtil.LogInfo("SysBot", $"Started all bots (Count: {prog.Bots.Length}).");
-        LogUtil.LogInfo("SysBot", "Press any key to stop execution and quit. Feel free to minimize this window!");
-        Console.ReadKey();
+        LogUtil.LogInfo("SysBot", "Running headless. Send SIGTERM or press Ctrl+C to stop.");
+
+        // Signal-Handler für headless LXC / systemd (kein TTY nötig)
+        var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => cts.Cancel();
+
+        try
+        {
+            await Task.Delay(Timeout.Infinite, cts.Token);
+        }
+        catch (OperationCanceledException) { }
+
+        LogUtil.LogInfo("SysBot", "Stopping all bots...");
         env.StopAll();
     }
 

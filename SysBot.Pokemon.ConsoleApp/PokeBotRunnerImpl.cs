@@ -1,6 +1,7 @@
 using PKHeX.Core;
 using SysBot.Pokemon.Discord;
 using SysBot.Pokemon.Twitch;
+using SysBot.Pokemon.YouTube;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -23,6 +24,7 @@ public class PokeBotRunnerImpl<T> : PokeBotRunner<T> where T : PKM, new()
     {
         AddDiscordBot(Hub.Config.Discord);
         AddTwitchBot(Hub.Config.Twitch);
+        AddYouTubeBot(Hub.Config.YouTube);
     }
 
     private void AddDiscordBot(DiscordSettings config)
@@ -46,11 +48,18 @@ public class PokeBotRunnerImpl<T> : PokeBotRunner<T> where T : PKM, new()
             return;
         if (string.IsNullOrWhiteSpace(config.Username))
             return;
-        if (string.IsNullOrWhiteSpace(config.Token))
-            return;
 
         Twitch = new TwitchBot<T>(config, Hub.Config);
         if (config.DistributionCountDown)
             Hub.BotSync.BarrierReleasingActions.Add(() => Twitch.StartingDistribution(config.MessageStart));
+    }
+
+    private void AddYouTubeBot(YouTubeSettings config)
+    {
+        if (string.IsNullOrWhiteSpace(config.ClientID))
+            return;
+
+        // YouTubeBot startet sich intern selbst via Task.Run im Konstruktor
+        _ = new YouTubeBot<T>(config, Hub);
     }
 }
