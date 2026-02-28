@@ -74,6 +74,7 @@ public static class BotContainer
         }
 
         LogUtil.Forwarders.Add(ConsoleForwarder.Instance);
+        InitUtil.InitializeStubs(prog.Mode);
         env.StartAll();
         LogUtil.LogInfo("SysBot", $"Started all bots (Count: {prog.Bots.Length}).");
 
