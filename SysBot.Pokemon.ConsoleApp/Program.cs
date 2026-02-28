@@ -1,5 +1,6 @@
 using PKHeX.Core;
 using SysBot.Base;
+using SysBot.Pokemon.ConsoleApp.WebApi;
 using SysBot.Pokemon.Discord.Helpers;
 using SysBot.Pokemon.Z3;
 using System;
@@ -75,6 +76,13 @@ public static class BotContainer
         LogUtil.Forwarders.Add(ConsoleForwarder.Instance);
         env.StartAll();
         LogUtil.LogInfo("SysBot", $"Started all bots (Count: {prog.Bots.Length}).");
+
+        // WebServer starten (HTTP-Kontrollpanel + Trade-API)
+        var host = new HeadlessBotHost(env, prog);
+        TradeEndpoints.Initialize(host);
+        if (prog.Hub.WebServer.EnableWebServer)
+            WebApiExtensions.InitWebServer(host);
+
         LogUtil.LogInfo("SysBot", "Running headless. Send SIGTERM or press Ctrl+C to stop.");
 
         // Signal-Handler für headless LXC / systemd (kein TTY nötig)
@@ -89,6 +97,7 @@ public static class BotContainer
         catch (OperationCanceledException) { }
 
         LogUtil.LogInfo("SysBot", "Stopping all bots...");
+        WebApiExtensions.StopWebServer(host);
         env.StopAll();
     }
 
