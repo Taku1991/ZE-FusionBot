@@ -56,13 +56,11 @@ internal static class HeadlessUpdateChecker
 
         if (isLinux)
         {
-            // Prefer Linux binary (no extension) or tar.gz
+            // Prefer Linux binary by exact name or no extension
             return assets.FirstOrDefault(a =>
-                    a.Name != null &&
-                    !a.Name.Contains('.') &&
-                    (a.Name.Contains("Linux", StringComparison.OrdinalIgnoreCase) ||
-                     a.Name == "SysBot.Pokemon.ConsoleApp" ||
-                     a.Name == "ZE_FusionBot"))
+                    a.Name == "SysBot.Pokemon.ConsoleApp" ||
+                    a.Name == "ZE_FusionBot" ||
+                    (a.Name != null && !a.Name.Contains('.') && a.Name.Contains("Linux", StringComparison.OrdinalIgnoreCase)))
                 ?.BrowserDownloadUrl
                 ?? assets.FirstOrDefault(a => a.Name?.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) == true)
                 ?.BrowserDownloadUrl;
@@ -77,17 +75,39 @@ internal static class HeadlessUpdateChecker
     {
         try
         {
-            var url = $"https://api.github.com/repos/{RepositoryOwner}/{RepositoryName}/releases/latest";
-            var response = await _httpClient.GetAsync(url);
+            bool isLinux = !OperatingSystem.IsWindows();
 
-            if (!response.IsSuccessStatusCode)
+            if (isLinux)
             {
-                LogUtil.LogError("HeadlessUpdateChecker", $"GitHub API error: {response.StatusCode}");
-                return null;
-            }
+                // On Linux, search through all releases to find the latest one with a Linux asset
+                var url = $"https://api.github.com/repos/{RepositoryOwner}/{RepositoryName}/releases?per_page=10";
+                var response = await _httpClient.GetAsync(url);
 
-            var json = await response.Content.ReadAsStringAsync();
-            return JsonConvert.DeserializeObject<ReleaseInfo>(json);
+                if (!response.IsSuccessStatusCode)
+                {
+                    LogUtil.LogError("HeadlessUpdateChecker", $"GitHub API error: {response.StatusCode}");
+                    return null;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var releases = JsonConvert.DeserializeObject<List<ReleaseInfo>>(json);
+                return releases?.FirstOrDefault(r => r.Assets?.Any(a =>
+                    a.Name != null && !a.Name.Contains('.')) == true);
+            }
+            else
+            {
+                var url = $"https://api.github.com/repos/{RepositoryOwner}/{RepositoryName}/releases/latest";
+                var response = await _httpClient.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    LogUtil.LogError("HeadlessUpdateChecker", $"GitHub API error: {response.StatusCode}");
+                    return null;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<ReleaseInfo>(json);
+            }
         }
         catch (Exception ex)
         {
