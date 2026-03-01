@@ -1234,6 +1234,10 @@ public partial class BotServer(IBotHost host, int port = 8080, int tcpPort = 808
 
                 if (root.TryGetProperty("ProcessPath", out var processPath))
                     instance.ProcessPath = processPath.GetString();
+
+                // Read ProcessId directly from the remote instance's INFO response
+                if (root.TryGetProperty("ProcessId", out var pidProp) && pidProp.TryGetInt32(out var remotePid) && remotePid != 0)
+                    instance.ProcessId = remotePid;
             }
 
             var botsResponse = QueryRemote(port, "LISTBOTS");

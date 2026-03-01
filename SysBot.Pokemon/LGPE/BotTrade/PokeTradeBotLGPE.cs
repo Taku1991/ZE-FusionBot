@@ -469,6 +469,10 @@ public class PokeTradeBotLGPE(PokeTradeHub<PB7> Hub, PokeBotState Config) : Poke
         else
             counts.CountStatsSettings.AddCompletedTrade();
 
+        // Increment trade count for profile card (LGPE uses pictocodes, not numeric codes)
+        if (poke.Trainer.ID != 0)
+            new TradeCodeStorage().IncrementTradeCount(poke.Trainer.ID);
+
         if (DumpSetting.Dump && !string.IsNullOrEmpty(DumpSetting.DumpFolder))
         {
             var subfolder = poke.Type.ToString().ToLower();

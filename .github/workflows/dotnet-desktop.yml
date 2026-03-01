@@ -72,8 +72,33 @@ jobs:
           name: ZEFusionBot
           path: ./publish
 
+  build-linux:
+    needs: version-check
+    if: needs.version-check.outputs.version_changed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      Project_Name: SysBot.Pokemon.ConsoleApp/SysBot.Pokemon.ConsoleApp.csproj
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.Project_Name }} --runtime linux-x64
+      - name: Publish
+        run: dotnet publish ${{ env.Project_Name }} --configuration Release --output ./publish-linux /p:PublishSingleFile=true /p:SelfContained=false /p:RuntimeIdentifier=linux-x64
+      - name: Upload Linux build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZEFusionBot-Linux
+          path: ./publish-linux/SysBot.Pokemon.ConsoleApp
+
   create-release:
-    needs: [version-check, build]
+    needs: [version-check, build, build-linux]
     if: needs.version-check.outputs.version_changed == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -105,11 +130,16 @@ jobs:
           echo "RECENT_CHANGES<<EOF" >> $GITHUB_ENV
           echo "$RECENT_CHANGES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-      - name: Download build artifacts
+      - name: Download Windows build artifacts
         uses: actions/download-artifact@v4
         with:
           name: ZEFusionBot
           path: ./publish
+      - name: Download Linux build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ZEFusionBot-Linux
+          path: ./publish-linux
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -118,7 +148,9 @@ jobs:
           body: |
             ## Recent Changes
             ${{ env.RECENT_CHANGES }}
-          files: ./publish/ZE_FusionBot.exe
+          files: |
+            ./publish/ZE_FusionBot.exe
+            ./publish-linux/SysBot.Pokemon.ConsoleApp
           draft: false
           prerelease: false
         env:

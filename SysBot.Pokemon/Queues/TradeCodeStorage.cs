@@ -47,6 +47,20 @@ public class TradeCodeStorage
         }
         return 0;
     }
+
+    public void IncrementTradeCount(ulong trainerID)
+    {
+        LoadFromFile();
+        if (_tradeCodeDetails!.TryGetValue(trainerID, out var details))
+        {
+            details.TradeCount++;
+        }
+        else
+        {
+            _tradeCodeDetails![trainerID] = new TradeCodeDetails { TradeCount = 1 };
+        }
+        SaveToFile();
+    }
     public TradeCodeDetails? GetTradeDetails(ulong trainerID)
     {
         LoadFromFile();
