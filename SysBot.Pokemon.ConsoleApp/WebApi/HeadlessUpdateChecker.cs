@@ -31,10 +31,7 @@ internal static class HeadlessUpdateChecker
         bool updateAvailable = latestRelease != null && latestRelease.TagName != PokeBot.Version;
         bool updateRequired = latestRelease?.Prerelease == false && IsUpdateRequired(latestRelease?.Body);
         string? newVersion = latestRelease?.TagName;
-        string? downloadUrl = latestRelease?.Assets
-            ?.FirstOrDefault(a => a.Name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true
-                               || a.Name?.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) == true)
-            ?.BrowserDownloadUrl;
+        string? downloadUrl = SelectBestAsset(latestRelease?.Assets);
 
         return (updateAvailable, updateRequired, newVersion ?? string.Empty, downloadUrl);
     }
@@ -48,9 +45,31 @@ internal static class HeadlessUpdateChecker
     public static async Task<string?> FetchDownloadUrlAsync()
     {
         var latestRelease = await FetchLatestReleaseAsync();
-        return latestRelease?.Assets
-            ?.FirstOrDefault(a => a.Name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true
-                               || a.Name?.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) == true)
+        return SelectBestAsset(latestRelease?.Assets);
+    }
+
+    private static string? SelectBestAsset(List<AssetInfo>? assets)
+    {
+        if (assets == null) return null;
+
+        bool isLinux = !OperatingSystem.IsWindows();
+
+        if (isLinux)
+        {
+            // Prefer Linux binary (no extension) or tar.gz
+            return assets.FirstOrDefault(a =>
+                    a.Name != null &&
+                    !a.Name.Contains('.') &&
+                    (a.Name.Contains("Linux", StringComparison.OrdinalIgnoreCase) ||
+                     a.Name == "SysBot.Pokemon.ConsoleApp" ||
+                     a.Name == "ZE_FusionBot"))
+                ?.BrowserDownloadUrl
+                ?? assets.FirstOrDefault(a => a.Name?.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) == true)
+                ?.BrowserDownloadUrl;
+        }
+
+        // Windows: prefer .exe
+        return assets.FirstOrDefault(a => a.Name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true)
             ?.BrowserDownloadUrl;
     }
 

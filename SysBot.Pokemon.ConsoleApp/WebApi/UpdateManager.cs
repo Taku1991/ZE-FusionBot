@@ -1632,9 +1632,8 @@ public static class UpdateManager
             string applicationDirectory = Path.GetDirectoryName(currentExePath) ?? "";
             string executableName = Path.GetFileName(currentExePath);
 
-            // Use ZE_FusionBot as the target name (standardized name, no .exe on Linux)
-            string targetExeName = "ZE_FusionBot";
-            string targetExePath = Path.Combine(applicationDirectory, targetExeName);
+            // Keep the same executable name so systemd finds it
+            string targetExePath = currentExePath;
             string backupPath = Path.Combine(applicationDirectory, $"{executableName}.backup");
 
             // Create shell script for update process (Linux-compatible)
@@ -1647,14 +1646,13 @@ if [ -f ""{currentExePath}"" ]; then
     if [ -f ""{backupPath}"" ]; then
         rm -f ""{backupPath}""
     fi
-    mv ""{currentExePath}"" ""{backupPath}""
+    cp ""{currentExePath}"" ""{backupPath}""
 fi
-# Install new version with standardized name
+# Install new version (keep original filename for systemd compatibility)
 mv ""{downloadedFilePath}"" ""{targetExePath}""
 # Make executable
 chmod +x ""{targetExePath}""
-# Start new version
-""{targetExePath}"" &
+echo 'Update complete. systemd will restart the service.'
 # Clean up
 rm -f ""$0""
 ";
@@ -1697,9 +1695,9 @@ rm -f ""$0""
                 Process.Start(startInfo);
             }
 
-            // Exit the current instance
-            LogUtil.LogInfo("Exiting application for update", "UpdateManager");
-            Environment.Exit(0);
+            // Exit with code 1 so systemd (Restart=on-failure) restarts the service with the new binary
+            LogUtil.LogInfo("Exiting application for update (systemd will restart)", "UpdateManager");
+            Environment.Exit(1);
         }
         catch (Exception ex)
         {
