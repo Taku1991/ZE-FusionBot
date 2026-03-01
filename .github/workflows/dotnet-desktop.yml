@@ -2,9 +2,9 @@ name: .NET Core Desktop
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feature/lxc-headless" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "feature/lxc-headless" ]
 
 permissions:
   contents: write
