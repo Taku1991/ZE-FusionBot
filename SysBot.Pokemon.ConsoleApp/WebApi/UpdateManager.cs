@@ -1629,74 +1629,58 @@ public static class UpdateManager
         try
         {
             string currentExePath = Environment.ProcessPath ?? "";
-            string applicationDirectory = Path.GetDirectoryName(currentExePath) ?? "";
-            string executableName = Path.GetFileName(currentExePath);
 
-            // Keep the same executable name so systemd finds it
+            // The target is always the exact path systemd uses in ExecStart.
+            // All 5+ instances share this one binary.
             string targetExePath = currentExePath;
-            string backupPath = Path.Combine(applicationDirectory, $"{executableName}.backup");
 
-            // Create shell script for update process (Linux-compatible)
-            string scriptPath = Path.Combine(Path.GetTempPath(), "UpdateSysBot.sh");
-            string scriptContent = $@"#!/bin/sh
-sleep 2
-echo 'Updating ZE-FusionBot...'
-# Backup current version
-if [ -f ""{currentExePath}"" ]; then
-    if [ -f ""{backupPath}"" ]; then
-        rm -f ""{backupPath}""
-    fi
-    cp ""{currentExePath}"" ""{backupPath}""
-fi
-# Install new version (keep original filename for systemd compatibility)
-mv ""{downloadedFilePath}"" ""{targetExePath}""
-# Make executable
-chmod +x ""{targetExePath}""
-echo 'Update complete. systemd will restart the service.'
-# Clean up
-rm -f ""$0""
-";
+            LogUtil.LogInfo($"Installing update: {downloadedFilePath} → {targetExePath}", "UpdateManager");
 
-            File.WriteAllText(scriptPath, scriptContent);
-
-            // Make the script executable
+            // Step 1: chmod +x on the downloaded file BEFORE the atomic replace.
+            // Files downloaded via HTTP have no execute bit set - systemd would fail
+            // to start the process with "Permission denied" otherwise.
             try
             {
                 var chmodInfo = new ProcessStartInfo
                 {
                     FileName = "chmod",
-                    Arguments = $"+x \"{scriptPath}\"",
+                    Arguments = $"+x \"{downloadedFilePath}\"",
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
                 Process.Start(chmodInfo)?.WaitForExit(5000);
+                LogUtil.LogInfo("Set executable permissions on new binary", "UpdateManager");
             }
-            catch { /* ignore on non-Unix */ }
-
-            LogUtil.LogInfo("Starting update shell script", "UpdateManager");
-
-            // Start the update shell script
-            var startInfo = new ProcessStartInfo
+            catch (Exception ex)
             {
-                FileName = "/bin/sh",
-                Arguments = $"\"{scriptPath}\"",
+                LogUtil.LogError($"chmod failed (non-fatal on Windows): {ex.Message}", "UpdateManager");
+            }
+
+            // Step 2: Atomic replace via mv -f (single rename() syscall on same filesystem).
+            // All running processes keep their old inode and continue unaffected until they exit.
+            // Only when systemd restarts each instance will it load the new binary from the new inode.
+            var mvInfo = new ProcessStartInfo
+            {
+                FileName = "mv",
+                Arguments = $"-f \"{downloadedFilePath}\" \"{targetExePath}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-
-            // Fallback to sh if /bin/sh not available
-            try
+            var mvProcess = Process.Start(mvInfo);
+            if (mvProcess == null || !mvProcess.WaitForExit(10000) || mvProcess.ExitCode != 0)
             {
-                Process.Start(startInfo);
-            }
-            catch
-            {
-                startInfo.FileName = "sh";
-                Process.Start(startInfo);
+                throw new Exception("mv command failed or timed out - binary was not replaced");
             }
 
-            // Exit with code 1 so systemd (Restart=on-failure) restarts the service with the new binary
-            LogUtil.LogInfo("Exiting application for update (systemd will restart)", "UpdateManager");
+            LogUtil.LogInfo($"Binary atomically replaced at: {targetExePath}", "UpdateManager");
+
+            // Step 3: Exit with code 1.
+            // systemd Restart=on-failure triggers an automatic restart for this (master) instance using:
+            //   ExecStart=/opt/zefusionbot/shared/bin/SysBot.Pokemon.ConsoleApp
+            //   WorkingDirectory=/opt/zefusionbot/%i  (instance-specific config.json)
+            // All slave instances were already sent EXIT via TCP and are being restarted by their
+            // own systemd units in parallel - no manual process spawning needed.
+            LogUtil.LogInfo("Exiting with code 1 - systemd will restart with new binary", "UpdateManager");
             Environment.Exit(1);
         }
         catch (Exception ex)

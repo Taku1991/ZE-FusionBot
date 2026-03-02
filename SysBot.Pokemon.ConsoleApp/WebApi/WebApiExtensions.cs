@@ -608,50 +608,24 @@ public static class WebApiExtensions
                 return "ERROR: Bot host not initialized";
             }
 
-            LogUtil.LogInfo("WebApiExtensions", $"Update triggered for slave instance on port {_tcpPort}");
+            LogUtil.LogInfo("WebApiExtensions", $"Update triggered for slave instance on port {_tcpPort} - exiting for systemd restart");
 
-            // Perform the actual update: download, install, and restart (same as master)
+            // The master has already atomically replaced the shared binary at this point.
+            // This slave just exits with code 1 so systemd (Restart=on-failure) restarts it
+            // using ExecStart=/opt/zefusionbot/shared/bin/SysBot.Pokemon.ConsoleApp and
+            // the correct WorkingDirectory=/opt/zefusionbot/%i (instance-specific config.json).
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    // Check for updates and get download URL
-                    var (updateAvailable, _, newVersion, downloadUrl) = await HeadlessUpdateChecker.CheckForUpdatesAsync(false);
-
-                    if (!updateAvailable && string.IsNullOrEmpty(downloadUrl))
-                    {
-                        LogUtil.LogInfo("WebApiExtensions", "No update available, but proceeding with restart for sync");
-                        _host.PerformRestart();
-                        return;
-                    }
-
-                    if (string.IsNullOrEmpty(downloadUrl))
-                    {
-                        LogUtil.LogError("WebApiExtensions", "No download URL available for update");
-                        lock (_updateLock) { _updateInProgress = false; }
-                        return;
-                    }
-
-                    LogUtil.LogInfo("WebApiExtensions", $"Downloading update from: {downloadUrl}");
-
-                    // Download the update
-                    string tempPath = await DownloadUpdateForSlaveAsync(downloadUrl);
-
-                    if (string.IsNullOrEmpty(tempPath))
-                    {
-                        LogUtil.LogError("WebApiExtensions", "Failed to download update");
-                        lock (_updateLock) { _updateInProgress = false; }
-                        return;
-                    }
-
-                    LogUtil.LogInfo("WebApiExtensions", $"Update downloaded to: {tempPath}");
-
-                    // Install the update via shell script (Linux-compatible)
-                    InstallUpdateAndRestartSlave(tempPath);
+                    // Brief delay so the "OK" response reaches the master before the socket closes
+                    await Task.Delay(500);
+                    LogUtil.LogInfo("WebApiExtensions", "Exiting slave instance - systemd will restart with new binary");
+                    Environment.Exit(1);
                 }
                 catch (Exception ex)
                 {
-                    LogUtil.LogError("WebApiExtensions", $"Error during slave update: {ex.Message}");
+                    LogUtil.LogError("WebApiExtensions", $"Error during slave exit: {ex.Message}");
                     lock (_updateLock) { _updateInProgress = false; }
                 }
             });
@@ -662,106 +636,6 @@ public static class WebApiExtensions
         {
             lock (_updateLock) { _updateInProgress = false; }
             return $"ERROR: {ex.Message}";
-        }
-    }
-
-    /// <summary>
-    /// Download update file for slave instance
-    /// </summary>
-    private static async Task<string> DownloadUpdateForSlaveAsync(string downloadUrl)
-    {
-        try
-        {
-            var uri = new Uri(downloadUrl);
-            var originalFileName = Path.GetFileName(uri.LocalPath);
-            string tempPath = Path.Combine(Path.GetTempPath(), $"{Path.GetFileNameWithoutExtension(originalFileName)}_{Guid.NewGuid()}.exe");
-
-            using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-            client.DefaultRequestHeaders.Add("User-Agent", "ZE-FusionBot");
-
-            var response = await client.GetAsync(downloadUrl);
-            response.EnsureSuccessStatusCode();
-
-            var fileBytes = await response.Content.ReadAsByteArrayAsync();
-            await File.WriteAllBytesAsync(tempPath, fileBytes);
-
-            LogUtil.LogInfo("WebApiExtensions", $"Downloaded {fileBytes.Length} bytes to {tempPath}");
-            return tempPath;
-        }
-        catch (Exception ex)
-        {
-            LogUtil.LogError("WebApiExtensions", $"Failed to download update: {ex.Message}");
-            return string.Empty;
-        }
-    }
-
-    /// <summary>
-    /// Install update and restart slave instance (Linux shell script, replaces Windows batch script)
-    /// </summary>
-    private static void InstallUpdateAndRestartSlave(string downloadedFilePath)
-    {
-        try
-        {
-            string currentExePath = Environment.ProcessPath ?? Environment.CurrentDirectory;
-            string applicationDirectory = Path.GetDirectoryName(currentExePath) ?? Environment.CurrentDirectory;
-            string executableName = Path.GetFileName(currentExePath);
-
-            // Use ZE_FusionBot as the target name (standardized name, no .exe on Linux)
-            string targetExeName = "ZE_FusionBot";
-            string targetExePath = Path.Combine(applicationDirectory, targetExeName);
-            string backupPath = Path.Combine(applicationDirectory, $"{executableName}.backup");
-
-            // Create shell script file for update process
-            string scriptPath = Path.Combine(Path.GetTempPath(), $"UpdateSysBot_Slave_{Environment.ProcessId}.sh");
-            string scriptContent = $@"#!/bin/sh
-sleep 2
-echo 'Updating ZE-FusionBot (Slave Instance)...'
-# Backup current version
-if [ -f '{currentExePath}' ]; then
-    [ -f '{backupPath}' ] && rm -f '{backupPath}'
-    mv '{currentExePath}' '{backupPath}'
-fi
-# Install new version with standardized name
-mv '{downloadedFilePath}' '{targetExePath}'
-chmod +x '{targetExePath}'
-# Start new version
-'{targetExePath}' &
-# Clean up this script
-rm -f '$0'
-";
-
-            File.WriteAllText(scriptPath, scriptContent);
-
-            // Make the script executable
-            using var chmod = Process.Start(new ProcessStartInfo
-            {
-                FileName = "chmod",
-                Arguments = $"+x {scriptPath}",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
-            chmod?.WaitForExit(5000);
-
-            LogUtil.LogInfo("WebApiExtensions", "Starting slave update shell script");
-
-            // Start the update shell script
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "/bin/sh",
-                Arguments = scriptPath,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            Process.Start(startInfo);
-
-            // Exit the current instance
-            LogUtil.LogInfo("WebApiExtensions", "Exiting slave instance for update");
-            _host?.PerformExit();
-        }
-        catch (Exception ex)
-        {
-            LogUtil.LogError("WebApiExtensions", $"Failed to install slave update: {ex.Message}");
-            lock (_updateLock) { _updateInProgress = false; }
         }
     }
 
