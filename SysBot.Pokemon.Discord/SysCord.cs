@@ -894,31 +894,7 @@ public sealed partial class SysCord<T> where T : PKM, new()
     {
         try
         {
-            await Log(new LogMessage(LogSeverity.Info, "Slash Commands", "Loading slash command modules...")).ConfigureAwait(false);
-
-            // Load all interaction modules from the assembly
-            var assembly = Assembly.GetExecutingAssembly();
-            await _interactions.AddModulesAsync(assembly, _services).ConfigureAwait(false);
-
-            // Manually add generic interaction modules with the specific type T
-            // Note: IsSubclassOf doesn't work for open generic types, so we check the base type directly
-            foreach (var t in assembly.DefinedTypes.Where(z =>
-                z.IsGenericTypeDefinition &&
-                z.BaseType != null &&
-                z.BaseType.IsGenericType &&
-                z.BaseType.GetGenericTypeDefinition() == typeof(InteractionModuleBase<>)))
-            {
-                try
-                {
-                    var genModule = t.MakeGenericType(typeof(T));
-                    await _interactions.AddModuleAsync(genModule, _services).ConfigureAwait(false);
-                    await Log(new LogMessage(LogSeverity.Debug, "Slash Commands", $"Registered generic module: {t.Name}<{typeof(T).Name}>")).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    await Log(new LogMessage(LogSeverity.Warning, "Slash Commands", $"Failed to register {t.Name}: {ex.Message}")).ConfigureAwait(false);
-                }
-            }
+            await Log(new LogMessage(LogSeverity.Info, "Slash Commands", "Registering slash commands...")).ConfigureAwait(false);
 
             // Register slash commands either globally or to a specific guild
             var guildId = SysCordSettings.Settings.SlashCommandGuildId;

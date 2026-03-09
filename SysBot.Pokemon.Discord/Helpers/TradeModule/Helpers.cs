@@ -321,9 +321,9 @@ public static class Helpers<T> where T : PKM, new()
         // ============================================================================
         // MAX LAIR POKEMON MOVE POPULATION BUG WORKAROUND
         // ============================================================================
-        // PKHeX.Core.dll (as of 01-22-2026, commit fe32739) has a bug where Max Lair
-        // Pokemon from SWSH Crown Tundra do not get moves automatically populated
-        // during legalization, causing them to be marked as illegal.
+        // PKHeX.Core.dll has a bug where Max Lair Pokemon from SWSH Crown Tundra
+        // do not get moves automatically populated (or only partially) during
+        // legalization, causing them to be marked as illegal.
         //
         // This workaround manually populates moves for Max Lair encounters after
         // generation but before validation.
@@ -331,10 +331,10 @@ public static class Helpers<T> where T : PKM, new()
         if (pkm is PK8 pk8 && !isEgg)
         {
             const int MaxLairLocationID = 244; // Max Lair in Crown Tundra
-            bool hasNoMoves = pk8.Move1 == 0 && pk8.Move2 == 0 && pk8.Move3 == 0 && pk8.Move4 == 0;
+            bool hasMissingMoves = pk8.Move1 == 0 || pk8.Move2 == 0 || pk8.Move3 == 0 || pk8.Move4 == 0;
             bool isFromMaxLair = pk8.MetLocation == MaxLairLocationID;
 
-            if (hasNoMoves && isFromMaxLair)
+            if (hasMissingMoves && isFromMaxLair)
             {
                 // Populate moves using PKHeX (not ALM)
                 pk8.SetSuggestedMoves();
@@ -390,6 +390,40 @@ public static class Helpers<T> where T : PKM, new()
                 la = laClone;
             }
         }
+
+        // ============================================================================
+        // MAX LAIR SHINY FALLBACK
+        // ============================================================================
+        // If a shiny PK8 is still invalid and not already at Max Lair, retry with
+        // MetLocation=244. Many SWSH legendaries and Ultra Beasts are shiny-eligible
+        // only via Dynamax Adventures (Max Lair). ALM sometimes generates them at
+        // the correct location but without moves, or fails to set the shiny PID.
+        // ============================================================================
+        if (!la.Valid && pkm is PK8 pk8Retry && set.Shiny && pk8Retry.MetLocation != 244)
+        {
+            var pk8RetryClone = (PK8)pk8Retry.Clone();
+            pk8RetryClone.MetLocation = 244;
+            pk8RetryClone.SetSuggestedMoves();
+            pk8RetryClone.HealPP();
+            pk8RetryClone.RefreshChecksum();
+            var laRetry = new LegalityAnalysis(pk8RetryClone);
+            if (laRetry.Valid)
+            {
+                pkm = pk8RetryClone;
+                la = laRetry;
+            }
+        }
+        // Also retry if already at Max Lair but still invalid (wrong moves)
+        else if (!la.Valid && pkm is PK8 pk8RetryLair && set.Shiny && pk8RetryLair.MetLocation == 244)
+        {
+            pk8RetryLair.SetSuggestedMoves();
+            pk8RetryLair.HealPP();
+            pk8RetryLair.RefreshChecksum();
+            la = new LegalityAnalysis(pk8RetryLair);
+        }
+        // ============================================================================
+        // END OF MAX LAIR SHINY FALLBACK
+        // ============================================================================
 
         if (pkm is not T pk || !la.Valid)
         {
