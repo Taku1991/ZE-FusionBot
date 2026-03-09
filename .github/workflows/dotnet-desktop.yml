@@ -88,7 +88,7 @@ jobs:
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           LAST_REF=$( [ -z "$LAST_TAG" ] && git rev-list --max-parents=0 HEAD || echo "$LAST_TAG" )
-          RECENT_CHANGES=$(git log --pretty=format:"- %s" $LAST_REF..HEAD)
+          RECENT_CHANGES=$(git log --pretty=format:"- %s" --first-parent $LAST_REF..HEAD)
           echo "RECENT_CHANGES<<EOF" >> $GITHUB_ENV
           echo "$RECENT_CHANGES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
@@ -154,7 +154,7 @@ jobs:
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           LAST_REF=$( [ -z "$LAST_TAG" ] && git rev-list --max-parents=0 HEAD || echo "$LAST_TAG" )
-          RECENT_CHANGES=$(git log --pretty=format:"- %s" $LAST_REF..HEAD)
+          RECENT_CHANGES=$(git log --pretty=format:"- %s" --first-parent $LAST_REF..HEAD)
           echo "RECENT_CHANGES<<EOF" >> $GITHUB_ENV
           echo "$RECENT_CHANGES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV

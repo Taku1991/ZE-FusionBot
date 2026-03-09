@@ -97,17 +97,9 @@ public static class WebApiExtensions
 
                 StartMasterMonitor();
                 RestartManager.Initialize(_host, _tcpPort);
-                // Check for any pending update state and attempt to resume
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(10000); // Wait for system to stabilize
-                    var currentState = UpdateManager.GetCurrentState();
-                    if (currentState != null && !currentState.IsComplete)
-                    {
-                        LogUtil.LogInfo("WebServer", $"Found incomplete update session {currentState.SessionId}, attempting to resume");
-                        await UpdateManager.StartOrResumeUpdateAsync(_host, _tcpPort);
-                    }
-                });
+                // Slaves must NOT resume updates - only the master (REST API host) handles
+                // update resumption. If slaves try to resume before the master has finished
+                // installing the new binary, they mark the update as failed prematurely.
 
                 // Slaves don't start REST API - only Master does
                 LogUtil.LogInfo("WebServer", "Running as slave instance - REST API will be provided by master on port 8080");
