@@ -92,7 +92,12 @@ internal static class HeadlessUpdateChecker
                 var json = await response.Content.ReadAsStringAsync();
                 var releases = JsonConvert.DeserializeObject<List<ReleaseInfo>>(json);
                 return releases?.FirstOrDefault(r => r.Assets?.Any(a =>
-                    a.Name != null && !a.Name.Contains('.')) == true);
+                    a.Name != null && (
+                        a.Name == "SysBot.Pokemon.ConsoleApp" ||
+                        a.Name == "ZE_FusionBot" ||
+                        (!a.Name.Contains('.') && a.Name.Contains("Linux", StringComparison.OrdinalIgnoreCase)) ||
+                        !a.Name.Contains('.')
+                    )) == true);
             }
             else
             {
