@@ -7,8 +7,6 @@
     </a>
 </h1>
 
-> ⚠️ **Font Notice:** If the program's fonts are not displaying properly for you, download them [here](https://github.com/Taku1991/ZE-FusionBot/blob/main/.extra/Fonts.7z) and install them on your machine.
-
 <p align="center">
   <i>Taku1991's fork of ZE-FusionBot — an independently evolved SysBot.NET project with custom enhancements, supporting LGPE, SWSH, BDSP, PLA, SV, and PLZA!</i>
 </p>
@@ -34,9 +32,6 @@
 `ZE FusionBot (Taku1991 Fork)` is an independently maintained fork of [Secludedly's ZE FusionBot](https://github.com/Secludedly/ZE-FusionBot), featuring custom enhancements, bug fixes, and optimizations developed for the [Pokemon Hideout](https://discord.gg/pokemonhideout) community. This fork shares ideas and improvements back with the original project while maintaining its own development direction.
 
 ---
-<p align="center">
-    <img src="https://i.imgur.com/zJF8VmN.gif" style="max-width: 100%; height: auto;">
-</p>
 
 ## 🧬 Fork Philosophy & Origins
 
@@ -100,10 +95,8 @@ This project is built upon the excellent work of many developers in the SysBot.N
 
 ## ✨ Highlights
 
-- One-click Game Restart, Hot Reload, and Updater.
 - Support for batch trades via Showdown format or .zip archives.
 - Mystery Pokémon and Eggs, Battle-Ready, HOME-Ready, and Event Pokémon trading modules.
-- Full GUI control for SysDVR and Switch Remote for PC integration.
 - Smart Auto-Correct and Auto-Legalization.
 - DM embeds with GIFs, Channel Status notifications, Announcement System, Keyword Response.
 - Built-in metrics: Queue tracking, trade counters, medal system.
@@ -113,42 +106,147 @@ This project is built upon the excellent work of many developers in the SysBot.N
 
 ---
 
-## 🖥️ GUI Features
+## 🐧 Linux / Headless Mode
 
-- Animated, hover-responsive panel buttons for Bots / Hub / Logs.
-- Color-coded UI themes: blue-purple primary, themed subpanels.
-- Fully redesigned icons, fonts, buttons, and layout.
-- Bot controller with sections for Address, Status, Trade Type, and Log time.
-- No native window titlebars — drag by top panel. Minimal, modern design.
-- Animated glow around controller buttons to indicate their use.
-- Progress bar in the controller that shows a visual glow during the trade process.
+ZE FusionBot ships a **ConsoleApp** (`SysBot.Pokemon.ConsoleApp`) for running the bot headless on Linux — no GUI required. Works on any Linux server, VPS, or container (LXC, Docker, etc.).
 
+### ✅ Requirements
 
----
+- **.NET 10 Runtime** (`linux-x64`, framework-dependent)
+- No desktop environment needed — pure CLI
+- All six games supported: LGPE, SWSH, BDSP, PLA, SV, PLZA
 
-## 🖼️ GUI Previews
+### 📦 Build & Publish
 
-<p align="center">
-    <img src="https://i.imgur.com/VZ2oeOy.gif" style="max-width: 100%; height: auto;">
-</p>
-<p align="center">
-    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_GeneralOverlook2.gif" style="max-width: 100%; height: auto;">
-</p>
-<p align="center">
-    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Environment2.gif" style="max-width: 100%; height: auto;">
-</p>
-<p align="center">
-    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Reload2.gif" style="max-width: 100%; height: auto;">
-</p>
-<p align="center">
-    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Themes2.gif" style="max-width: 100%; height: auto;">
-</p>
-<p align="center">
-    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Starting2.gif" style="max-width: 100%; height: auto;">
-</p>
-<p align="center">
-    <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_Update2.gif" style="max-width: 100%; height: auto;">
-</p>
+Publish the ConsoleApp for Linux from your Windows machine:
+
+```bash
+dotnet publish SysBot.Pokemon.ConsoleApp \
+  -c Release \
+  -r linux-x64 \
+  --self-contained false \
+  -o "Bot Dateien/"
+```
+
+Then upload the contents of `Bot Dateien/` to `/opt/zefusionbot/shared/bin/` on your server.
+
+### 📁 Directory Layout
+
+Each bot gets its own directory with its own `config.json`. All instances share the same binary:
+
+```
+/opt/zefusionbot/
+├── shared/
+│   ├── bin/              ← Published ConsoleApp binaries (shared by all instances)
+│   └── mgdb/             ← Shared Mystery Gift DB
+├── lgpe/
+│   ├── config.json
+│   ├── distribute/
+│   ├── events/
+│   ├── battleready/
+│   └── dump/
+├── bdsp/
+│   └── config.json
+├── pla/
+│   └── config.json
+├── plza/
+│   └── config.json
+├── sv/
+│   └── config.json
+└── swsh/
+    └── config.json
+```
+
+### ⚙️ Configuration
+
+Each bot reads `config.json` from its own working directory. The easiest way to create configs is via the WinForms project, then copy them to the server.
+
+> If no `config.json` is found on first run, a default template is created and the bot exits with instructions.
+
+### 🔧 Systemd Template Service
+
+Create `/etc/systemd/system/zefusionbot@.service`:
+
+```ini
+[Unit]
+Description=ZE FusionBot - %i
+After=network.target
+
+[Service]
+Type=simple
+User=botuser
+WorkingDirectory=/opt/zefusionbot/%i
+ExecStart=/usr/bin/dotnet /opt/zefusionbot/shared/bin/SysBot.Pokemon.ConsoleApp.dll
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 🛠️ Managing Bots
+
+The `%i` in the service name is replaced by the instance name (= the bot's directory name):
+
+```bash
+# Enable & start a bot instance
+systemctl enable zefusionbot@sv
+systemctl start zefusionbot@sv
+
+# Stop / Restart
+systemctl stop zefusionbot@sv
+systemctl restart zefusionbot@sv
+
+# View logs (last 50 lines)
+journalctl -u zefusionbot@sv.service -n 50 --no-pager
+
+# Follow logs live
+journalctl -u zefusionbot@sv.service -f
+```
+
+Replace `sv` with any instance name: `lgpe`, `bdsp`, `pla`, `plza`, `swsh`.
+
+### 🖥️ Web Control Panel
+
+When `EnableWebServer: true` in `config.json`, each bot starts a built-in HTTP panel:
+
+```
+http://<server-ip>:<WebServerPort>/
+```
+
+The panel lets you:
+- View bot status and logs in real time
+- Start / Stop / Idle / Resume / Restart all bots
+- Toggle the Switch screen on/off remotely
+- Trigger a process restart or graceful shutdown
+
+### 🔌 REST Trade API
+
+A JSON REST API runs alongside the web panel. Useful for external integrations:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET`  | `/api/trade/health` | Health check + bot status |
+| `POST` | `/api/trade/submit` | Submit a trade (Showdown set) |
+| `GET`  | `/api/trade/status/{id}` | Poll trade status by ID |
+| `POST` | `/api/trade/{id}/cancel` | Cancel a queued trade |
+
+**Example: submit a trade**
+
+```bash
+curl -X POST http://<server-ip>:<port>/api/trade/submit \
+  -H "Content-Type: application/json" \
+  -d '{
+    "game": "SV",
+    "trainerName": "Ash",
+    "userId": "123456789",
+    "showdownSet": "Pikachu\nAbility: Static\nShiny: Yes\nEVs: 252 Spe\n- Thunderbolt"
+  }'
+```
+
+### 🖼️ Image Rendering on Linux
+
+All trade embeds (ball overlays, Pokémon sprites, dominant color extraction) use **SkiaSharp** instead of GDI+ — fully compatible with Linux without any additional setup.
 
 ---
 
@@ -161,17 +259,6 @@ This project is built upon the excellent work of many developers in the SysBot.N
 
 <!-- Row 1 -->
 <table>
-  <tr>
-    <td align="center" width="50%">
-      <strong>Switch Remote for PC</strong><br />
-      <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_SwitchRemoteForPC.gif" alt="Switch Remote for PC" width="100%" />
-    </td>
-    <td align="center" width="50%">
-      <strong>SysDVR</strong><br />
-      <img src="https://raw.githubusercontent.com/Taku1991/ZE-FusionBot/main/.readme/README_SysDVR.gif" alt="SysDVR" width="100%" />
-    </td>
-  </tr>
-
 <!-- Row 2 -->
   <tr>
     <td align="center" width="50%">
@@ -337,9 +424,6 @@ This project is built upon the excellent work of many developers in the SysBot.N
 | `setScreenOffAll` | screenOffAll, scrOffAll | Turn off screen for all bots. | `setScreenOffAll` | Sudo, Owner |
 | `peek` | repeek | Take and send a screenshot. | `peek` | Sudo, Owner |
 | `video` | Video | Record a GIF from the Switch. | `video` | Sudo, Owner |
-| `startSysdvr` | dvrstart, startdvr, sysdvrstart, dvr, stream | Start SysDVR streaming. | `startSysdvr` | Owner |
-| `sysDvr` | — | Show instructions for SysDVR. | `sysDvr` | Owner |
-| `startController` | controllerstart, startcontrol, controlstart, startremote, remotestart, sbr, controller | Start Switch Remote controller. | `startController` | Owner |
 
 ## 📡 Bot Management
 
