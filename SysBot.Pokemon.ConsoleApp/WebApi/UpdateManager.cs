@@ -432,51 +432,59 @@ public static class UpdateManager
             // Stop all bots with progress tracking
             await StopAllBotsSimpleAsync(host, state.Instances, cancellationToken);
 
-            // Phase 3: Update all instances
+            // Phase 3: Download and install the new binary FIRST (before any instance exits)
+            // This ensures all instances restart with the new binary, not the old one.
             state.Phase = UpdatePhase.Updating;
-            state.Message = "Updating instances...";
-            state.IdleProgress = null; // Clear idle progress
+            state.Message = "Downloading update...";
+            state.IdleProgress = null;
             SaveState();
 
-            // Update slaves first, then master
             var slaves = state.Instances.Where(i => !i.IsMaster).OrderBy(i => i.TcpPort).ToList();
-            var master = state.Instances.FirstOrDefault(i => i.IsMaster);
+            LogUtil.LogInfo($"Found {slaves.Count} slave(s): {string.Join(", ", slaves.Select(s => s.TcpPort))}", "UpdateManager");
 
-            // Log the update order for debugging
-            LogUtil.LogInfo($"Update order - Slaves: {string.Join(", ", slaves.Select(s => s.TcpPort))}, Master: {master?.TcpPort ?? 0}", "UpdateManager");
-
-            // Update all slave instances first
-            foreach (var slave in slaves)
+            // Download new binary to temp
+            downloadUrl = state.DownloadUrl;
+            if (string.IsNullOrWhiteSpace(downloadUrl))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                state.CurrentUpdatingInstance = $"Instance {slave.TcpPort}";
-                state.Message = $"Updating slave instance on port {slave.TcpPort}...";
-                LogUtil.LogInfo($"Updating slave instance on port {slave.TcpPort}", "UpdateManager");
-                SaveState();
-                await UpdateInstanceAsync(host, slave, state.TargetVersion, cancellationToken);
-            }
-
-            // Update master last - this will trigger a restart
-            if (master != null)
-            {
-                state.CurrentUpdatingInstance = "Master";
-                state.Message = "Updating master instance (will restart)...";
-                LogUtil.LogInfo($"Updating master instance on port {master.TcpPort} - this will restart the application", "UpdateManager");
-                SaveState();
-                await UpdateInstanceAsync(host, master, state.TargetVersion, cancellationToken);
-                // Master update triggers restart - state will be resumed
+                CompleteUpdate(state, false, "Download URL missing");
                 return;
             }
 
-            // Phase 3: Verify updates
-            state.Phase = UpdatePhase.Verifying;
-            state.Message = "Verifying updates...";
+            state.Message = $"Downloading {state.TargetVersion}...";
             SaveState();
+            string downloadedFilePath = await DownloadUpdateAsync(downloadUrl, cancellationToken);
+            if (string.IsNullOrEmpty(downloadedFilePath))
+            {
+                CompleteUpdate(state, false, "Download failed");
+                return;
+            }
 
-            await Task.Delay(3000, cancellationToken); // Let system stabilize
+            // Atomically replace the shared binary — all instances still run from the old inode
+            // until they restart. systemd will load the new binary for every restart.
+            state.Message = "Installing binary...";
+            SaveState();
+            InstallBinaryOnly(downloadedFilePath);
+            LogUtil.LogInfo("Shared binary replaced. Signaling all instances to restart.", "UpdateManager");
 
-            var allSuccess = state.Instances.All(i => i.Status == InstanceStatus.Completed);
-            CompleteUpdate(state, allSuccess, allSuccess ? "Update completed successfully" : "Update completed with errors");
+            // Phase 4: Signal slaves to exit — systemd restarts them with the new binary
+            state.Message = $"Signaling {slaves.Count} slave(s) to restart...";
+            SaveState();
+            foreach (var slave in slaves)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                LogUtil.LogInfo($"Sending UPDATE to slave on port {slave.TcpPort}", "UpdateManager");
+                // Fire-and-forget: slave will exit(1) after 500 ms, systemd handles restart
+                _ = Task.Run(() => BotServer.QueryRemote(slave.TcpPort, "UPDATE"), CancellationToken.None);
+            }
+
+            // Brief pause so slaves receive the command before master tears down the TCP listener
+            await Task.Delay(1500, cancellationToken);
+
+            // Phase 5: Exit master — systemd restarts with the new binary
+            state.Message = "Restarting master instance...";
+            SaveState();
+            LogUtil.LogInfo("Exiting master — systemd will restart with new binary.", "UpdateManager");
+            Environment.Exit(1);
         }
         catch (OperationCanceledException)
         {
@@ -986,7 +994,7 @@ public static class UpdateManager
 
         await Task.Run(() =>
         {
-            host.SendAll(BotControlCommand.Idle);
+            host.SendAll(BotControlCommand.Stop);
         }, cancellationToken);
     }
 
@@ -1006,7 +1014,7 @@ public static class UpdateManager
         {
             cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(Config.NetworkTimeoutMs);
-            await Task.Run(() => BotServer.QueryRemote(port, "IDLEALL"), cts.Token);
+            await Task.Run(() => BotServer.QueryRemote(port, "STOPALL"), cts.Token);
         }
         finally
         {
@@ -1619,6 +1627,59 @@ public static class UpdateManager
 
         LogUtil.LogInfo($"Downloaded {fileBytes.Length} bytes to {tempPath} (original: {originalFileName})", "UpdateManager");
         return tempPath;
+    }
+
+    /// <summary>
+    /// Atomically replace the shared binary on disk WITHOUT exiting.
+    /// The caller is responsible for signaling all instances to restart afterwards.
+    /// </summary>
+    private static void InstallBinaryOnly(string downloadedFilePath)
+    {
+        try
+        {
+            string currentExePath = Environment.ProcessPath ?? "";
+            string targetExePath = currentExePath;
+
+            LogUtil.LogInfo($"Replacing binary: {downloadedFilePath} → {targetExePath}", "UpdateManager");
+
+            // chmod +x before the atomic replace
+            try
+            {
+                var chmodInfo = new ProcessStartInfo
+                {
+                    FileName = "chmod",
+                    Arguments = $"+x \"{downloadedFilePath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                Process.Start(chmodInfo)?.WaitForExit(5000);
+                LogUtil.LogInfo("Set executable permissions on new binary", "UpdateManager");
+            }
+            catch (Exception ex)
+            {
+                LogUtil.LogError($"chmod failed (non-fatal on Windows): {ex.Message}", "UpdateManager");
+            }
+
+            // Atomic replace via mv -f
+            var mvInfo = new ProcessStartInfo
+            {
+                FileName = "mv",
+                Arguments = $"-f \"{downloadedFilePath}\" \"{targetExePath}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            var mvProcess = Process.Start(mvInfo);
+            if (mvProcess == null || !mvProcess.WaitForExit(10000) || mvProcess.ExitCode != 0)
+                throw new Exception("mv command failed or timed out - binary was not replaced");
+
+            LogUtil.LogInfo($"Binary atomically replaced at: {targetExePath}", "UpdateManager");
+            // No exit here — caller handles signaling slaves and then calling Environment.Exit(1)
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogError($"Failed to install binary: {ex.Message}", "UpdateManager");
+            throw;
+        }
     }
 
     /// <summary>
