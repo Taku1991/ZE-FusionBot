@@ -152,7 +152,7 @@ jobs:
           echo "CURRENT_VERSION=$CURRENT_VERSION" >> $GITHUB_ENV
       - name: Get Recent Changes
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          LAST_TAG=$(git tag -l "*LXC*" --sort=-version:refname | head -1)
           LAST_REF=$( [ -z "$LAST_TAG" ] && git rev-list --max-parents=0 HEAD || echo "$LAST_TAG" )
           RECENT_CHANGES=$(git log --pretty=format:"- %s" --first-parent $LAST_REF..HEAD)
           echo "RECENT_CHANGES<<EOF" >> $GITHUB_ENV
