@@ -1166,28 +1166,26 @@ public partial class BotServer(IBotHost host, int port = 8080, int tcpPort = 808
     {
         try
         {
-            var processes = Process.GetProcessesByName("ZE_FusionBot");
-            foreach (var proc in processes)
+            // Read port files directly - works on all platforms regardless of process name
+            // (on Linux the process is "SysBot.Pokemon.ConsoleApp", not "ZE_FusionBot")
+            var portDir = Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports");
+            if (Directory.Exists(portDir))
             {
-                try
+                foreach (var portFile in Directory.GetFiles(portDir, "ZE_FusionBot_*.port"))
                 {
-                    var exePath = proc.MainModule?.FileName;
-                    if (string.IsNullOrEmpty(exePath))
-                        continue;
-
-                    // Always use Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports") for port files so all instances can see them
-                    var portFile = Path.Combine(Path.Combine(Path.GetTempPath(), "ZE_FusionBot_Ports"), $"ZE_FusionBot_{proc.Id}.port");
-                    if (File.Exists(portFile))
+                    try
                     {
+                        var fileName = Path.GetFileNameWithoutExtension(portFile);
+                        var pidStr = fileName["ZE_FusionBot_".Length..];
+                        if (!int.TryParse(pidStr, out var pid))
+                            continue;
+
                         var portText = File.ReadAllText(portFile).Trim();
                         if (int.TryParse(portText, out var filePort) && filePort == port)
-                        {
-                            return proc.Id;
-                        }
+                            return pid;
                     }
+                    catch { }
                 }
-                catch { }
-                finally { proc.Dispose(); }
             }
         }
         catch { }
