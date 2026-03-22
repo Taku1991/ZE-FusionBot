@@ -174,7 +174,16 @@ public class TradeStartModule<T> : ModuleBase<SocketCommandContext> where T : PK
                 .WithFooter($"{footerText}\u200B", ballImgUrl)
                 .Build();
 
-            await c.SendMessageAsync(embed: embed).ConfigureAwait(false);
+            try
+            {
+                await c.SendMessageAsync(embed: embed).ConfigureAwait(false);
+            }
+            catch (HttpException ex) when (ex.HttpCode is System.Net.HttpStatusCode.ServiceUnavailable
+                                                       or System.Net.HttpStatusCode.GatewayTimeout
+                                                       or System.Net.HttpStatusCode.BadGateway)
+            {
+                // Discord is temporarily unavailable; skip this notification rather than crashing.
+            }
         }
 
         // REGISTER FORWARDER ONCE EVER
