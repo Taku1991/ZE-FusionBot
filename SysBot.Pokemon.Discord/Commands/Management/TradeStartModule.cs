@@ -183,6 +183,11 @@ public class TradeStartModule<T> : ModuleBase<SocketCommandContext> where T : PK
                                                        or System.Net.HttpStatusCode.BadGateway)
             {
                 // Discord is temporarily unavailable; skip this notification rather than crashing.
+                LogUtil.LogError($"Trade start notification skipped (Discord {(int)ex.HttpCode}): {ex.Message}", "TradeStartModule");
+            }
+            catch (Exception ex)
+            {
+                LogUtil.LogError($"Trade start notification failed: {ex.Message}", "TradeStartModule");
             }
         }
 
