@@ -650,11 +650,6 @@ public sealed partial class SysCord<T> where T : PKM, new()
                 return;
             }
 
-            if (msg.Attachments.Count > 0)
-            {
-                await TryHandleAttachmentAsync(msg).ConfigureAwait(false);
-            }
-
             char[] allowedPrefixes = new[]
             {
     '$', '!', '.', '=', '%', '~', '-', '+', ',', '/', '?', '*', '^',
@@ -672,7 +667,11 @@ public sealed partial class SysCord<T> where T : PKM, new()
             {
                 // If message doesn't start with ANY allowed prefix → it's just normal chat
                 if (content.Length == 0 || !allowedPrefixes.Contains(content[0]))
+                {
+                    if (msg.Attachments.Count > 0)
+                        await TryHandleAttachmentAsync(msg).ConfigureAwait(false);
                     return;
+                }
 
                 // Now we know it STARTS with a prefix-like symbol.
                 // If it's NOT the correct prefix → show the error.
@@ -700,7 +699,9 @@ public sealed partial class SysCord<T> where T : PKM, new()
                 }
                 else
                 {
-                    // normal chatting → ignore
+                    // normal chatting → show Showdown info for attachments, then ignore
+                    if (msg.Attachments.Count > 0)
+                        await TryHandleAttachmentAsync(msg).ConfigureAwait(false);
                     return;
                 }
             }
@@ -710,12 +711,6 @@ public sealed partial class SysCord<T> where T : PKM, new()
             var handled = await TryHandleCommandAsync(msg, context, argPos);
             if (handled)
                 return;
-
-
-            if (msg.Attachments.Count > 0)
-            {
-                await TryHandleAttachmentAsync(msg).ConfigureAwait(false);
-            }
         }
         catch (HttpException ex) when (ex.DiscordCode == DiscordErrorCode.InsufficientPermissions) // Missing Permissions
         {
