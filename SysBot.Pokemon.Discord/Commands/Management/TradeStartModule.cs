@@ -104,20 +104,17 @@ public class TradeStartModule<T> : ModuleBase<SocketCommandContext> where T : PK
                 ? GameInfo.Strings.Species[detail.TradeData.Species]
                 : "";
 
-            string ballImgUrl =
-                "https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/dm-uhoherror.gif";
+            string ballImgUrl = "https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/dm-uhoherror.gif";
 
             if (detail.TradeData != null &&
                 detail.Type is not (PokeTradeType.Clone or PokeTradeType.Dump or PokeTradeType.Seed or PokeTradeType.FixOT))
             {
                 var ballName = GameInfo.GetStrings("en").balllist[detail.TradeData.Ball]
-                    .Replace(" ", "")
-                    .Replace("(LA)", "")
+                    .Replace(" ", "_")
                     .ToLower();
 
-                ballName = ballName == "pokéball"
-                    ? "pokeball"
-                    : (ballName.Contains("(la)") ? "la" + ballName : ballName);
+                if (ballName.Contains("_(la)"))
+                    ballName = "la" + ballName.Replace("_(la)", "");
 
                 ballImgUrl =
                     $"https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/AltBallImg/28x28/{ballName}.png";
@@ -142,7 +139,7 @@ public class TradeStartModule<T> : ModuleBase<SocketCommandContext> where T : PK
                     PokeTradeType.Dump => "https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/Dumping.png",
                     PokeTradeType.FixOT => "https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/FixOTing.png",
                     PokeTradeType.Seed => "https://raw.githubusercontent.com/Secludedly/ZE-FusionBot-Sprite-Images/main/Seeding.png",
-                    _ => TradeExtensions<T>.PokeImg(detail.TradeData!, false, true)
+                    _ => TradeExtensions<T>.PokeImg(detail.TradeData!, false, false, SysCord<T>.Runner.Config.Trade.TradeEmbedSettings.PreferredImageSize)
                 };
 
             var (r, g, b) = await GetDominantColorAsync(embedImageUrl);
