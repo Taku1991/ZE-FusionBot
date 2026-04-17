@@ -623,7 +623,7 @@ public static class Helpers<T> where T : PKM, new()
         // Instead: load the matching WC8 file from the MGDB and call ConvertToPKM
         // directly — this uses PKHeX's own verified generation logic.
         // ============================================================================
-        if (!la.Valid && pkm is PK8 pk8WC && pk8WC.MetLocation >= 40000 && pk8WC.IsShiny)
+        if (!la.Valid && pkm is PK8 pk8WC && pk8WC.MetLocation >= 40000)
         {
             var mgdbPath = Info.Hub.Config.Legality.MGDBPath;
             if (Directory.Exists(mgdbPath))
@@ -636,7 +636,7 @@ public static class Helpers<T> where T : PKM, new()
                         var wc8 = new WC8(File.ReadAllBytes(wc8File));
                         if (wc8.Species != pk8WC.Species || wc8.Form != pk8WC.Form)
                             continue;
-                        if (wc8.IsShiny == false)
+                        if (wc8.IsShiny != pk8WC.IsShiny)
                             continue;
 
                         var directPkm = wc8.ConvertToPKM(sav);
