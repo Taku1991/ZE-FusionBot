@@ -623,9 +623,9 @@ public static class Helpers<T> where T : PKM, new()
         // Instead: load the matching WC8 file from the MGDB and call ConvertToPKM
         // directly — this uses PKHeX's own verified generation logic.
         // ============================================================================
-        if (!la.Valid && pkm is PK8 pk8WC)
+        if (!la.Valid && pkm is PK8 pk8WCDbg)
         {
-            LogUtil.LogInfo($"WC8 debug: species={pk8WC.Species} form={pk8WC.Form} metloc={pk8WC.MetLocation} fateful={pk8WC.FatefulEncounter} shiny={pk8WC.IsShiny}", "Legality");
+            LogUtil.LogInfo($"WC8 debug: species={pk8WCDbg.Species} form={pk8WCDbg.Form} metloc={pk8WCDbg.MetLocation} fateful={pk8WCDbg.FatefulEncounter} shiny={pk8WCDbg.IsShiny}", "Legality");
         }
 
         if (!la.Valid && pkm is PK8 pk8WC && (pk8WC.MetLocation >= 40000 || pk8WC.FatefulEncounter))
