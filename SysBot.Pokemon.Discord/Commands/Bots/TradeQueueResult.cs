@@ -1,15 +1,8 @@
-using System;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
-using Discord.WebSocket;
-using Newtonsoft.Json;
-using SysBot.Pokemon.Helpers;
-
 namespace SysBot.Pokemon.Discord.Commands.Bots
 {
     public class TradeQueueResult(bool success)
     {
+<<<<<<< HEAD
         private static readonly HttpClient _client = new() { Timeout = TimeSpan.FromSeconds(10) };
         private static bool _initialized = false;
         private static bool _allowed = true;
@@ -57,5 +50,8 @@ namespace SysBot.Pokemon.Discord.Commands.Bots
                 return true;
             }
         }
+=======
+        public bool Success { get; set; } = success;
+>>>>>>> upstream/main
     }
 }
