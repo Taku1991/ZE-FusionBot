@@ -894,16 +894,24 @@ public static class Helpers<T> where T : PKM, new()
         {
             // WC8 event: try the configured language, revert if it breaks the Mystery Gift match
             var requestedLang = ValidateLanguageForGame(pk, finalLanguage);
+            Console.Error.WriteLine($"[ZE-PREP] fateful=true pkLang={pk.Language} finalLang={finalLanguage} requestedLang={requestedLang}");
             if (requestedLang != pk.Language)
             {
                 var originalLang = pk.Language;
                 pk.Language = requestedLang;
                 pk.RefreshChecksum();
-                if (!new LegalityAnalysis(pk).Valid)
+                var laAfter = new LegalityAnalysis(pk).Valid;
+                Console.Error.WriteLine($"[ZE-PREP] lang changed {originalLang}->{requestedLang} valid={laAfter}");
+                if (!laAfter)
                 {
                     pk.Language = originalLang;
                     pk.RefreshChecksum();
+                    Console.Error.WriteLine($"[ZE-PREP] reverted to {originalLang}");
                 }
+            }
+            else
+            {
+                Console.Error.WriteLine($"[ZE-PREP] lang already matches, no change needed");
             }
         }
         var validatedLanguage = pk.Language;
