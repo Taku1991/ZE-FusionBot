@@ -631,14 +631,18 @@ public static class Helpers<T> where T : PKM, new()
         if (!la.Valid && pkm is PK8 pk8WC && (pk8WC.MetLocation >= 40000 || pk8WC.FatefulEncounter))
         {
             var mgdbPath = Info.Hub.Config.Legality.MGDBPath;
+            LogUtil.LogInfo($"WC8 block entered: mgdbPath={mgdbPath} exists={Directory.Exists(mgdbPath)}", "Legality");
             if (Directory.Exists(mgdbPath))
             {
                 var wc8Files = Directory.GetFiles(mgdbPath, "*.wc8", SearchOption.AllDirectories);
+                LogUtil.LogInfo($"WC8 files found: {wc8Files.Length}", "Legality");
                 foreach (var wc8File in wc8Files)
                 {
                     try
                     {
                         var wc8 = new WC8(File.ReadAllBytes(wc8File));
+                        if (wc8.Species == pk8WC.Species)
+                            LogUtil.LogInfo($"WC8 species match: file={Path.GetFileName(wc8File)} wc8form={wc8.Form} pk8form={pk8WC.Form} wc8shiny={wc8.IsShiny} pk8shiny={pk8WC.IsShiny}", "Legality");
                         if (wc8.Species != pk8WC.Species || wc8.Form != pk8WC.Form)
                             continue;
                         if (wc8.IsShiny != pk8WC.IsShiny)
