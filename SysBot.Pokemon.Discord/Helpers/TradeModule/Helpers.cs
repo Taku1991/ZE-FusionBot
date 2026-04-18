@@ -623,34 +623,48 @@ public static class Helpers<T> where T : PKM, new()
         // Instead: load the matching WC8 file from the MGDB and call ConvertToPKM
         // directly — this uses PKHeX's own verified generation logic.
         // ============================================================================
-        Console.Error.WriteLine($"[ZE-WC8] laValid={la.Valid} isPK8={pkm is PK8} species={pkm?.Species} form={(pkm as PK8)?.Form} metloc={(pkm as PK8)?.MetLocation} fateful={(pkm as PK8)?.FatefulEncounter}");
-        if (!la.Valid && pkm is PK8 pk8WCDbg)
-        {
-            LogUtil.LogInfo($"WC8 debug: species={pk8WCDbg.Species} form={pk8WCDbg.Form} metloc={pk8WCDbg.MetLocation} fateful={pk8WCDbg.FatefulEncounter} shiny={pk8WCDbg.IsShiny}", "Legality");
-        }
+        // Also enter WC8 block for valid FatefulEncounter PK8 that need a language fix:
+        // ALM always generates with the default trainer (English), but for event Pokémon
+        // the OT name is language-specific (e.g. "Dyna Adventure" EN vs "Dyna-Abenteuer" DE).
+        // Changing language post-generation breaks legality; we must regenerate via ConvertToPKM
+        // with a language-appropriate trainer so PKHeX picks the correct OT from the WC8 card.
+        bool needsWC8LangFix = la.Valid
+            && pkm is PK8 pk8FELang
+            && pk8FELang.FatefulEncounter
+            && finalLanguage != 0
+            && pk8FELang.Language != finalLanguage;
 
-        if (!la.Valid && pkm is PK8 pk8WC && (pk8WC.MetLocation >= 40000 || pk8WC.FatefulEncounter))
+        if ((!la.Valid || needsWC8LangFix) && pkm is PK8 pk8WC && (pk8WC.MetLocation >= 40000 || pk8WC.FatefulEncounter))
         {
             var mgdbPath = Info.Hub.Config.Legality.MGDBPath;
-            LogUtil.LogInfo($"WC8 block entered: mgdbPath={mgdbPath} exists={Directory.Exists(mgdbPath)}", "Legality");
             if (Directory.Exists(mgdbPath))
             {
                 var wc8Files = Directory.GetFiles(mgdbPath, "*.wc8", SearchOption.AllDirectories);
-                LogUtil.LogInfo($"WC8 files found: {wc8Files.Length}", "Legality");
                 foreach (var wc8File in wc8Files)
                 {
                     try
                     {
                         var wc8 = new WC8(File.ReadAllBytes(wc8File));
-                        if (wc8.Species == pk8WC.Species)
-                            LogUtil.LogInfo($"WC8 species match: file={Path.GetFileName(wc8File)} wc8form={wc8.Form} pk8form={pk8WC.Form} wc8shiny={wc8.IsShiny} pk8shiny={pk8WC.IsShiny}", "Legality");
                         if (wc8.Species != pk8WC.Species || wc8.Form != pk8WC.Form)
                             continue;
                         if (wc8.IsShiny != pk8WC.IsShiny)
                             continue;
 
-                        var directPkm = wc8.ConvertToPKM(sav);
-                        if (directPkm is not T directT)
+                        // For language fix: use a trainer with the target language so ConvertToPKM
+                        // picks the correct language-specific OT from the WC8 card.
+                        ITrainerInfo convertTrainer = needsWC8LangFix
+                            ? new SimpleTrainerInfo(sav.Version)
+                            {
+                                OT = sav.OT,
+                                TID16 = sav.TID16,
+                                SID16 = sav.SID16,
+                                Language = finalLanguage,
+                                Generation = sav.Generation
+                            }
+                            : sav;
+
+                        var directPkm = wc8.ConvertToPKM(convertTrainer);
+                        if (directPkm is not T)
                             continue;
 
                         // Clear relearn moves — WC8 event gifts don't use them
@@ -661,13 +675,26 @@ public static class Helpers<T> where T : PKM, new()
                         directPkm.RefreshChecksum();
 
                         var laWC8 = new LegalityAnalysis(directPkm);
-                        LogUtil.LogInfo($"WC8 ConvertToPKM: file={Path.GetFileName(wc8File)} valid={laWC8.Valid} fateful={directPkm.FatefulEncounter} shiny={directPkm.IsShiny}", "Legality");
+                        Console.Error.WriteLine($"[ZE-WC8] langFix={needsWC8LangFix} file={Path.GetFileName(wc8File)} valid={laWC8.Valid} lang={directPkm.Language}");
 
-                        // Use WC8 result if valid; if still invalid, use it anyway as best effort
-                        // (AddTradeToQueueAsync performs the final legality gate)
-                        pkm = directPkm;
-                        la = laWC8;
-                        break;
+                        if (needsWC8LangFix)
+                        {
+                            // Only replace if the new version is valid AND has the correct language
+                            if (laWC8.Valid && directPkm.Language == finalLanguage)
+                            {
+                                pkm = directPkm;
+                                la = laWC8;
+                                break;
+                            }
+                            // Otherwise keep trying other WC8 files; if none match, keep the original
+                        }
+                        else
+                        {
+                            // Original behaviour: use WC8 result as best effort
+                            pkm = directPkm;
+                            la = laWC8;
+                            break;
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -892,27 +919,10 @@ public static class Helpers<T> where T : PKM, new()
         }
         else
         {
-            // WC8 event: try the configured language, revert if it breaks the Mystery Gift match
-            var requestedLang = ValidateLanguageForGame(pk, finalLanguage);
-            Console.Error.WriteLine($"[ZE-PREP] fateful=true pkLang={pk.Language} finalLang={finalLanguage} requestedLang={requestedLang}");
-            if (requestedLang != pk.Language)
-            {
-                var originalLang = pk.Language;
-                pk.Language = requestedLang;
-                pk.RefreshChecksum();
-                var laAfter = new LegalityAnalysis(pk).Valid;
-                Console.Error.WriteLine($"[ZE-PREP] lang changed {originalLang}->{requestedLang} valid={laAfter}");
-                if (!laAfter)
-                {
-                    pk.Language = originalLang;
-                    pk.RefreshChecksum();
-                    Console.Error.WriteLine($"[ZE-PREP] reverted to {originalLang}");
-                }
-            }
-            else
-            {
-                Console.Error.WriteLine($"[ZE-PREP] lang already matches, no change needed");
-            }
+            // WC8/FatefulEncounter: language was already set correctly during generation
+            // (ProcessShowdownSetAsync regenerates via ConvertToPKM with the right language).
+            // Don't overwrite it here — changing language post-generation breaks the
+            // Mystery Gift database match (OT name is language-specific on the WC8 card).
         }
         var validatedLanguage = pk.Language;
 
