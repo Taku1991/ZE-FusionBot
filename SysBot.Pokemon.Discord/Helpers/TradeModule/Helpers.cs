@@ -883,8 +883,14 @@ public static class Helpers<T> where T : PKM, new()
 
         // Validate language is supported for this game version
         // SpanishL (11) isn't supported in some games, fall back to Spanish (7)
-        var validatedLanguage = ValidateLanguageForGame(pk, finalLanguage);
-        pk.Language = validatedLanguage;
+        // Skip language change for WC8 event Pokémon (FatefulEncounter) — their language
+        // is fixed by the distribution and changing it breaks the Mystery Gift database match.
+        if (!pk.FatefulEncounter)
+        {
+            var lang = ValidateLanguageForGame(pk, finalLanguage);
+            pk.Language = lang;
+        }
+        var validatedLanguage = pk.Language;
 
         // CRITICAL: Asian languages only support 6-character OT names
         // Replace English OT with Asian characters for Asian languages
