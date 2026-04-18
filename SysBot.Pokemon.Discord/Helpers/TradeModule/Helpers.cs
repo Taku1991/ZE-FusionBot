@@ -890,6 +890,22 @@ public static class Helpers<T> where T : PKM, new()
             var lang = ValidateLanguageForGame(pk, finalLanguage);
             pk.Language = lang;
         }
+        else
+        {
+            // WC8 event: try the configured language, revert if it breaks the Mystery Gift match
+            var requestedLang = ValidateLanguageForGame(pk, finalLanguage);
+            if (requestedLang != pk.Language)
+            {
+                var originalLang = pk.Language;
+                pk.Language = requestedLang;
+                pk.RefreshChecksum();
+                if (!new LegalityAnalysis(pk).Valid)
+                {
+                    pk.Language = originalLang;
+                    pk.RefreshChecksum();
+                }
+            }
+        }
         var validatedLanguage = pk.Language;
 
         // CRITICAL: Asian languages only support 6-character OT names
