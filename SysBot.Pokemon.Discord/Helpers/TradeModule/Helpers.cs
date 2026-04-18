@@ -652,29 +652,21 @@ public static class Helpers<T> where T : PKM, new()
                         if (directPkm is not T directT)
                             continue;
 
+                        // Clear relearn moves — WC8 event gifts don't use them
+                        directPkm.RelearnMove1 = 0;
+                        directPkm.RelearnMove2 = 0;
+                        directPkm.RelearnMove3 = 0;
+                        directPkm.RelearnMove4 = 0;
+                        directPkm.RefreshChecksum();
+
                         var laWC8 = new LegalityAnalysis(directPkm);
                         LogUtil.LogInfo($"WC8 ConvertToPKM: file={Path.GetFileName(wc8File)} valid={laWC8.Valid} fateful={directPkm.FatefulEncounter} shiny={directPkm.IsShiny}", "Legality");
 
-                        // If only relearn move errors remain, clear them and recheck
-                        if (!laWC8.Valid)
-                        {
-                            var results = laWC8.Results;
-                            bool onlyRelearnErrors = results.All(r => r.Identifier == CheckIdentifier.RelearnMove || r.Valid);
-                            if (onlyRelearnErrors)
-                            {
-                                directPkm.SetRelearnMoves(new ushort[4]);
-                                directPkm.RefreshChecksum();
-                                laWC8 = new LegalityAnalysis(directPkm);
-                                LogUtil.LogInfo($"WC8 relearn cleared: file={Path.GetFileName(wc8File)} valid={laWC8.Valid}", "Legality");
-                            }
-                        }
-
-                        if (laWC8.Valid)
-                        {
-                            pkm = directPkm;
-                            la = laWC8;
-                            break;
-                        }
+                        // Use WC8 result if valid; if still invalid, use it anyway as best effort
+                        // (AddTradeToQueueAsync performs the final legality gate)
+                        pkm = directPkm;
+                        la = laWC8;
+                        break;
                     }
                     catch (Exception ex)
                     {
