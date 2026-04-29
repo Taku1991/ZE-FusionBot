@@ -667,11 +667,6 @@ public static class Helpers<T> where T : PKM, new()
                         if (directPkm is not T)
                             continue;
 
-                        // Clear relearn moves — WC8 event gifts don't use them
-                        directPkm.RelearnMove1 = 0;
-                        directPkm.RelearnMove2 = 0;
-                        directPkm.RelearnMove3 = 0;
-                        directPkm.RelearnMove4 = 0;
                         directPkm.RefreshChecksum();
 
                         var laWC8 = new LegalityAnalysis(directPkm);
@@ -705,6 +700,227 @@ public static class Helpers<T> where T : PKM, new()
         }
         // ============================================================================
         // END OF WC8 EVENT FIX
+        // ============================================================================
+
+        // ============================================================================
+        // WC9 EVENT FIX — Direct WC9.ConvertToPKM (SV)
+        // ============================================================================
+        // Same logic as WC8 block above: ALM generates event PK9 with the default
+        // (English) trainer, so fixed-OT events get the English OT name. For German
+        // (or any non-English) requests we must regenerate via ConvertToPKM with a
+        // language-appropriate trainer so PKHeX picks the correct OT from the WC9 card.
+        // ============================================================================
+        bool needsWC9LangFix = la.Valid
+            && pkm is PK9 pk9FELang
+            && pk9FELang.FatefulEncounter
+            && finalLanguage != 0
+            && pk9FELang.Language != finalLanguage;
+
+        if ((!la.Valid || needsWC9LangFix) && pkm is PK9 pk9WC && pk9WC.FatefulEncounter)
+        {
+            var mgdbPath = Info.Hub.Config.Legality.MGDBPath;
+            if (Directory.Exists(mgdbPath))
+            {
+                var wc9Files = Directory.GetFiles(mgdbPath, "*.wc9", SearchOption.AllDirectories);
+                foreach (var wc9File in wc9Files)
+                {
+                    try
+                    {
+                        var wc9 = new WC9(File.ReadAllBytes(wc9File));
+                        if (wc9.Species != pk9WC.Species || wc9.Form != pk9WC.Form)
+                            continue;
+                        if (wc9.IsShiny != pk9WC.IsShiny)
+                            continue;
+
+                        ITrainerInfo convertTrainer = needsWC9LangFix
+                            ? new SimpleTrainerInfo(sav.Version)
+                            {
+                                OT = sav.OT,
+                                TID16 = sav.TID16,
+                                SID16 = sav.SID16,
+                                Language = finalLanguage,
+                                Generation = sav.Generation
+                            }
+                            : sav;
+
+                        var directPkm = wc9.ConvertToPKM(convertTrainer);
+                        if (directPkm is not T)
+                            continue;
+
+                        directPkm.RefreshChecksum();
+
+                        var laWC9 = new LegalityAnalysis(directPkm);
+                        Console.Error.WriteLine($"[ZE-WC9] langFix={needsWC9LangFix} file={Path.GetFileName(wc9File)} valid={laWC9.Valid} lang={directPkm.Language}");
+
+                        if (needsWC9LangFix)
+                        {
+                            if (laWC9.Valid && directPkm.Language == finalLanguage)
+                            {
+                                pkm = directPkm;
+                                la = laWC9;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            pkm = directPkm;
+                            la = laWC9;
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogUtil.LogInfo($"WC9 ConvertToPKM error: {ex.Message}", "Legality");
+                    }
+                }
+            }
+        }
+        // ============================================================================
+        // END OF WC9 EVENT FIX
+        // ============================================================================
+
+        // ============================================================================
+        // WB8 EVENT FIX — Direct WB8.ConvertToPKM (BDSP)
+        // ============================================================================
+        bool needsWB8LangFix = la.Valid
+            && pkm is PB8 pb8FELang
+            && pb8FELang.FatefulEncounter
+            && finalLanguage != 0
+            && pb8FELang.Language != finalLanguage;
+
+        if ((!la.Valid || needsWB8LangFix) && pkm is PB8 pb8WC && pb8WC.FatefulEncounter)
+        {
+            var mgdbPath = Info.Hub.Config.Legality.MGDBPath;
+            if (Directory.Exists(mgdbPath))
+            {
+                var wb8Files = Directory.GetFiles(mgdbPath, "*.wb8", SearchOption.AllDirectories);
+                foreach (var wb8File in wb8Files)
+                {
+                    try
+                    {
+                        var wb8 = new WB8(File.ReadAllBytes(wb8File));
+                        if (wb8.Species != pb8WC.Species || wb8.Form != pb8WC.Form)
+                            continue;
+                        if (wb8.IsShiny != pb8WC.IsShiny)
+                            continue;
+
+                        ITrainerInfo convertTrainer = needsWB8LangFix
+                            ? new SimpleTrainerInfo(sav.Version)
+                            {
+                                OT = sav.OT,
+                                TID16 = sav.TID16,
+                                SID16 = sav.SID16,
+                                Language = finalLanguage,
+                                Generation = sav.Generation
+                            }
+                            : sav;
+
+                        var directPkm = wb8.ConvertToPKM(convertTrainer);
+                        if (directPkm is not T)
+                            continue;
+
+                        directPkm.RefreshChecksum();
+
+                        var laWB8 = new LegalityAnalysis(directPkm);
+                        Console.Error.WriteLine($"[ZE-WB8] langFix={needsWB8LangFix} file={Path.GetFileName(wb8File)} valid={laWB8.Valid} lang={directPkm.Language}");
+
+                        if (needsWB8LangFix)
+                        {
+                            if (laWB8.Valid && directPkm.Language == finalLanguage)
+                            {
+                                pkm = directPkm;
+                                la = laWB8;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            pkm = directPkm;
+                            la = laWB8;
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogUtil.LogInfo($"WB8 ConvertToPKM error: {ex.Message}", "Legality");
+                    }
+                }
+            }
+        }
+        // ============================================================================
+        // END OF WB8 EVENT FIX
+        // ============================================================================
+
+        // ============================================================================
+        // WA8 EVENT FIX — Direct WA8.ConvertToPKM (PLA)
+        // ============================================================================
+        bool needsWA8LangFix = la.Valid
+            && pkm is PA8 pa8FELang
+            && pa8FELang.FatefulEncounter
+            && finalLanguage != 0
+            && pa8FELang.Language != finalLanguage;
+
+        if ((!la.Valid || needsWA8LangFix) && pkm is PA8 pa8WC && pa8WC.FatefulEncounter)
+        {
+            var mgdbPath = Info.Hub.Config.Legality.MGDBPath;
+            if (Directory.Exists(mgdbPath))
+            {
+                var wa8Files = Directory.GetFiles(mgdbPath, "*.wa8", SearchOption.AllDirectories);
+                foreach (var wa8File in wa8Files)
+                {
+                    try
+                    {
+                        var wa8 = new WA8(File.ReadAllBytes(wa8File));
+                        if (wa8.Species != pa8WC.Species || wa8.Form != pa8WC.Form)
+                            continue;
+                        if (wa8.IsShiny != pa8WC.IsShiny)
+                            continue;
+
+                        ITrainerInfo convertTrainer = needsWA8LangFix
+                            ? new SimpleTrainerInfo(sav.Version)
+                            {
+                                OT = sav.OT,
+                                TID16 = sav.TID16,
+                                SID16 = sav.SID16,
+                                Language = finalLanguage,
+                                Generation = sav.Generation
+                            }
+                            : sav;
+
+                        var directPkm = wa8.ConvertToPKM(convertTrainer);
+                        if (directPkm is not T)
+                            continue;
+
+                        directPkm.RefreshChecksum();
+
+                        var laWA8 = new LegalityAnalysis(directPkm);
+                        Console.Error.WriteLine($"[ZE-WA8] langFix={needsWA8LangFix} file={Path.GetFileName(wa8File)} valid={laWA8.Valid} lang={directPkm.Language}");
+
+                        if (needsWA8LangFix)
+                        {
+                            if (laWA8.Valid && directPkm.Language == finalLanguage)
+                            {
+                                pkm = directPkm;
+                                la = laWA8;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            pkm = directPkm;
+                            la = laWA8;
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogUtil.LogInfo($"WA8 ConvertToPKM error: {ex.Message}", "Legality");
+                    }
+                }
+            }
+        }
+        // ============================================================================
+        // END OF WA8 EVENT FIX
         // ============================================================================
 
         // ============================================================================
@@ -910,20 +1126,13 @@ public static class Helpers<T> where T : PKM, new()
 
         // Validate language is supported for this game version
         // SpanishL (11) isn't supported in some games, fall back to Spanish (7)
-        // Skip language change for WC8 event Pokémon (FatefulEncounter) — their language
-        // is fixed by the distribution and changing it breaks the Mystery Gift database match.
-        if (!pk.FatefulEncounter)
-        {
-            var lang = ValidateLanguageForGame(pk, finalLanguage);
+        var lang = ValidateLanguageForGame(pk, finalLanguage);
+        // For FatefulEncounter (WC8) Pokémon: skip language assignment only when the
+        // WC8 block already set the correct language. If language still doesn't match
+        // (WC8 file not in MGDB or regeneration failed), set it anyway so the downstream
+        // legality gate in AddTradeToQueueAsync can report the OT mismatch to the user.
+        if (lang != 0 && (!pk.FatefulEncounter || pk.Language != lang))
             pk.Language = lang;
-        }
-        else
-        {
-            // WC8/FatefulEncounter: language was already set correctly during generation
-            // (ProcessShowdownSetAsync regenerates via ConvertToPKM with the right language).
-            // Don't overwrite it here — changing language post-generation breaks the
-            // Mystery Gift database match (OT name is language-specific on the WC8 card).
-        }
         var validatedLanguage = pk.Language;
 
         // CRITICAL: Asian languages only support 6-character OT names
