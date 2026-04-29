@@ -806,12 +806,13 @@ public static class Helpers<T> where T : PKM, new()
                         if (directPkm is not T)
                             continue;
 
-                        if (wc9.Form != pk9WC.Form)
+                        bool wc9FormAdjusted = wc9.Form != pk9WC.Form;
+                        if (wc9FormAdjusted)
                             directPkm.Form = pk9WC.Form;
                         directPkm.RefreshChecksum();
 
                         var laWC9 = new LegalityAnalysis(directPkm);
-                        Console.Error.WriteLine($"[ZE-WC9] langFix={needsWC9LangFix} file={Path.GetFileName(wc9File)} valid={laWC9.Valid} lang={directPkm.Language}");
+                        LogUtil.LogInfo($"[ZE-WC9] langFix={needsWC9LangFix} formAdj={wc9FormAdjusted} file={Path.GetFileName(wc9File)} valid={laWC9.Valid} lang={directPkm.Language} form={directPkm.Form}", "Legality");
 
                         if (needsWC9LangFix)
                         {
@@ -820,6 +821,25 @@ public static class Helpers<T> where T : PKM, new()
                                 pkm = directPkm;
                                 la = laWC9;
                                 break;
+                            }
+                            // Fallback: form adjustment likely broke legality (PKHeX checks WC form).
+                            // Copy only the OT/Language fields from the German WC9-generated PKM
+                            // onto the original valid ALM-generated PKM (already has the correct form).
+                            if (directPkm.Language == finalLanguage)
+                            {
+                                var cloned = pkm.Clone();
+                                cloned.OriginalTrainerName = directPkm.OriginalTrainerName;
+                                cloned.Language = directPkm.Language;
+                                cloned.OriginalTrainerGender = directPkm.OriginalTrainerGender;
+                                cloned.RefreshChecksum();
+                                var laCloned = new LegalityAnalysis(cloned);
+                                LogUtil.LogInfo($"[ZE-WC9-OT] valid={laCloned.Valid} lang={cloned.Language} form={cloned.Form} ot={cloned.OriginalTrainerName}", "Legality");
+                                if (laCloned.Valid && cloned.Language == finalLanguage && cloned is T clonedT)
+                                {
+                                    pkm = clonedT;
+                                    la = laCloned;
+                                    break;
+                                }
                             }
                         }
                         else
