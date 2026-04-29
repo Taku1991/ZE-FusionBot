@@ -762,6 +762,9 @@ public static class Helpers<T> where T : PKM, new()
             && finalLanguage != 0
             && pk9FELang.Language != finalLanguage;
 
+        if (pkm is PK9 pk9Diag)
+            LogUtil.LogInfo($"[ZE-WC9-DIAG] species={pk9Diag.Species} form={pk9Diag.Form} valid={la.Valid} fe={pk9Diag.FatefulEncounter} lang={pk9Diag.Language} finalLang={finalLanguage} needsFix={needsWC9LangFix}", "Legality");
+
         if ((!la.Valid || needsWC9LangFix) && pkm is PK9 pk9WC && pk9WC.FatefulEncounter)
         {
             var mgdbPath = Info.Hub.Config.Legality.MGDBPath;
@@ -1174,12 +1177,14 @@ public static class Helpers<T> where T : PKM, new()
         // Validate language is supported for this game version
         // SpanishL (11) isn't supported in some games, fall back to Spanish (7)
         var lang = ValidateLanguageForGame(pk, finalLanguage);
+        LogUtil.LogInfo($"[ZE-PREP] species={pk.Species} fe={pk.FatefulEncounter} lang={pk.Language} finalLang={finalLanguage} validatedLang={lang}", "Legality");
         // For FatefulEncounter (WC8) Pokémon: skip language assignment only when the
         // WC8 block already set the correct language. If language still doesn't match
         // (WC8 file not in MGDB or regeneration failed), set it anyway so the downstream
         // legality gate in AddTradeToQueueAsync can report the OT mismatch to the user.
         if (lang != 0 && (!pk.FatefulEncounter || pk.Language != lang))
             pk.Language = lang;
+        LogUtil.LogInfo($"[ZE-PREP-AFTER] species={pk.Species} lang={pk.Language}", "Legality");
         var validatedLanguage = pk.Language;
 
         // CRITICAL: Asian languages only support 6-character OT names
