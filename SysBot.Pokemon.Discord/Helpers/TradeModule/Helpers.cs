@@ -691,7 +691,12 @@ public static class Helpers<T> where T : PKM, new()
                     try
                     {
                         var wc8 = new WC8(File.ReadAllBytes(wc8File));
-                        if (wc8.Species != pk8WC.Species || wc8.Form != pk8WC.Form)
+                        if (wc8.Species != pk8WC.Species)
+                            continue;
+                        // For language fix: allow base form (0) WC8 to match alternate forms
+                        // (e.g. Deoxys distributed as Normal but user requests Attack form)
+                        bool wc8FormOk = wc8.Form == pk8WC.Form || (needsWC8LangFix && wc8.Form == 0 && pk8WC.Form != 0);
+                        if (!wc8FormOk)
                             continue;
                         if (wc8.IsShiny != pk8WC.IsShiny)
                             continue;
@@ -713,6 +718,8 @@ public static class Helpers<T> where T : PKM, new()
                         if (directPkm is not T)
                             continue;
 
+                        if (wc8.Form != pk8WC.Form)
+                            directPkm.Form = pk8WC.Form;
                         directPkm.RefreshChecksum();
 
                         var laWC8 = new LegalityAnalysis(directPkm);
@@ -776,7 +783,10 @@ public static class Helpers<T> where T : PKM, new()
                     try
                     {
                         var wc9 = new WC9(File.ReadAllBytes(wc9File));
-                        if (wc9.Species != pk9WC.Species || wc9.Form != pk9WC.Form)
+                        if (wc9.Species != pk9WC.Species)
+                            continue;
+                        bool wc9FormOk = wc9.Form == pk9WC.Form || (needsWC9LangFix && wc9.Form == 0 && pk9WC.Form != 0);
+                        if (!wc9FormOk)
                             continue;
                         if (wc9.IsShiny != pk9WC.IsShiny)
                             continue;
@@ -796,6 +806,8 @@ public static class Helpers<T> where T : PKM, new()
                         if (directPkm is not T)
                             continue;
 
+                        if (wc9.Form != pk9WC.Form)
+                            directPkm.Form = pk9WC.Form;
                         directPkm.RefreshChecksum();
 
                         var laWC9 = new LegalityAnalysis(directPkm);
@@ -848,7 +860,10 @@ public static class Helpers<T> where T : PKM, new()
                     try
                     {
                         var wb8 = new WB8(File.ReadAllBytes(wb8File));
-                        if (wb8.Species != pb8WC.Species || wb8.Form != pb8WC.Form)
+                        if (wb8.Species != pb8WC.Species)
+                            continue;
+                        bool wb8FormOk = wb8.Form == pb8WC.Form || (needsWB8LangFix && wb8.Form == 0 && pb8WC.Form != 0);
+                        if (!wb8FormOk)
                             continue;
                         if (wb8.IsShiny != pb8WC.IsShiny)
                             continue;
@@ -868,6 +883,8 @@ public static class Helpers<T> where T : PKM, new()
                         if (directPkm is not T)
                             continue;
 
+                        if (wb8.Form != pb8WC.Form)
+                            directPkm.Form = pb8WC.Form;
                         directPkm.RefreshChecksum();
 
                         var laWB8 = new LegalityAnalysis(directPkm);
@@ -920,7 +937,10 @@ public static class Helpers<T> where T : PKM, new()
                     try
                     {
                         var wa8 = new WA8(File.ReadAllBytes(wa8File));
-                        if (wa8.Species != pa8WC.Species || wa8.Form != pa8WC.Form)
+                        if (wa8.Species != pa8WC.Species)
+                            continue;
+                        bool wa8FormOk = wa8.Form == pa8WC.Form || (needsWA8LangFix && wa8.Form == 0 && pa8WC.Form != 0);
+                        if (!wa8FormOk)
                             continue;
                         if (wa8.IsShiny != pa8WC.IsShiny)
                             continue;
@@ -940,6 +960,8 @@ public static class Helpers<T> where T : PKM, new()
                         if (directPkm is not T)
                             continue;
 
+                        if (wa8.Form != pa8WC.Form)
+                            directPkm.Form = pa8WC.Form;
                         directPkm.RefreshChecksum();
 
                         var laWA8 = new LegalityAnalysis(directPkm);
