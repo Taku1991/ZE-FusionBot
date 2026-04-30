@@ -723,22 +723,19 @@ public static class Helpers<T> where T : PKM, new()
                         directPkm.RefreshChecksum();
 
                         var laWC8 = new LegalityAnalysis(directPkm);
-                        Console.Error.WriteLine($"[ZE-WC8] langFix={needsWC8LangFix} file={Path.GetFileName(wc8File)} valid={laWC8.Valid} lang={directPkm.Language}");
 
                         if (needsWC8LangFix)
                         {
-                            // Only replace if the new version is valid AND has the correct language
                             if (laWC8.Valid && directPkm.Language == finalLanguage)
                             {
                                 pkm = directPkm;
                                 la = laWC8;
+                                effectiveLanguage = finalLanguage;
                                 break;
                             }
-                            // Otherwise keep trying other WC8 files; if none match, keep the original
                         }
                         else
                         {
-                            // Original behaviour: use WC8 result as best effort
                             pkm = directPkm;
                             la = laWC8;
                             break;
@@ -768,9 +765,6 @@ public static class Helpers<T> where T : PKM, new()
             && pk9FELang.FatefulEncounter
             && finalLanguage != 0
             && pk9FELang.Language != finalLanguage;
-
-        if (pkm is PK9 pk9Diag)
-            LogUtil.LogInfo($"[ZE-WC9-DIAG] species={pk9Diag.Species} form={pk9Diag.Form} valid={la.Valid} fe={pk9Diag.FatefulEncounter} lang={pk9Diag.Language} finalLang={finalLanguage} needsFix={needsWC9LangFix}", "Legality");
 
         if ((!la.Valid || needsWC9LangFix) && pkm is PK9 pk9WC && pk9WC.FatefulEncounter)
         {
@@ -812,18 +806,17 @@ public static class Helpers<T> where T : PKM, new()
                         directPkm.RefreshChecksum();
 
                         var laWC9 = new LegalityAnalysis(directPkm);
-                        LogUtil.LogInfo($"[ZE-WC9] langFix={needsWC9LangFix} formAdj={wc9FormAdjusted} file={Path.GetFileName(wc9File)} valid={laWC9.Valid} lang={directPkm.Language} form={directPkm.Form}", "Legality");
-
                         if (needsWC9LangFix)
                         {
                             if (laWC9.Valid && directPkm.Language == finalLanguage)
                             {
                                 pkm = directPkm;
                                 la = laWC9;
+                                effectiveLanguage = finalLanguage;
                                 break;
                             }
                             // Fallback: form adjustment likely broke legality (PKHeX checks WC form).
-                            // Copy only the OT/Language fields from the German WC9-generated PKM
+                            // Copy only the OT/Language fields from the WC9-generated PKM
                             // onto the original valid ALM-generated PKM (already has the correct form).
                             if (directPkm.Language == finalLanguage)
                             {
@@ -833,11 +826,11 @@ public static class Helpers<T> where T : PKM, new()
                                 cloned.OriginalTrainerGender = directPkm.OriginalTrainerGender;
                                 cloned.RefreshChecksum();
                                 var laCloned = new LegalityAnalysis(cloned);
-                                LogUtil.LogInfo($"[ZE-WC9-OT] valid={laCloned.Valid} lang={cloned.Language} form={cloned.Form} ot={cloned.OriginalTrainerName}", "Legality");
                                 if (laCloned.Valid && cloned.Language == finalLanguage && cloned is T clonedT)
                                 {
                                     pkm = clonedT;
                                     la = laCloned;
+                                    effectiveLanguage = finalLanguage;
                                     break;
                                 }
                             }
@@ -908,7 +901,6 @@ public static class Helpers<T> where T : PKM, new()
                         directPkm.RefreshChecksum();
 
                         var laWB8 = new LegalityAnalysis(directPkm);
-                        Console.Error.WriteLine($"[ZE-WB8] langFix={needsWB8LangFix} file={Path.GetFileName(wb8File)} valid={laWB8.Valid} lang={directPkm.Language}");
 
                         if (needsWB8LangFix)
                         {
@@ -916,6 +908,7 @@ public static class Helpers<T> where T : PKM, new()
                             {
                                 pkm = directPkm;
                                 la = laWB8;
+                                effectiveLanguage = finalLanguage;
                                 break;
                             }
                         }
@@ -985,7 +978,6 @@ public static class Helpers<T> where T : PKM, new()
                         directPkm.RefreshChecksum();
 
                         var laWA8 = new LegalityAnalysis(directPkm);
-                        Console.Error.WriteLine($"[ZE-WA8] langFix={needsWA8LangFix} file={Path.GetFileName(wa8File)} valid={laWA8.Valid} lang={directPkm.Language}");
 
                         if (needsWA8LangFix)
                         {
@@ -993,6 +985,7 @@ public static class Helpers<T> where T : PKM, new()
                             {
                                 pkm = directPkm;
                                 la = laWA8;
+                                effectiveLanguage = finalLanguage;
                                 break;
                             }
                         }
@@ -1219,14 +1212,12 @@ public static class Helpers<T> where T : PKM, new()
         // Validate language is supported for this game version
         // SpanishL (11) isn't supported in some games, fall back to Spanish (7)
         var lang = ValidateLanguageForGame(pk, finalLanguage);
-        LogUtil.LogInfo($"[ZE-PREP] species={pk.Species} fe={pk.FatefulEncounter} lang={pk.Language} finalLang={finalLanguage} validatedLang={lang}", "Legality");
-        // For FatefulEncounter (WC8) Pokémon: skip language assignment only when the
-        // WC8 block already set the correct language. If language still doesn't match
-        // (WC8 file not in MGDB or regeneration failed), set it anyway so the downstream
+        // For FatefulEncounter Pokémon: skip language assignment only when the
+        // WC block already set the correct language. If language still doesn't match
+        // (WC file not in MGDB or regeneration failed), set it anyway so the downstream
         // legality gate in AddTradeToQueueAsync can report the OT mismatch to the user.
         if (lang != 0 && (!pk.FatefulEncounter || pk.Language != lang))
             pk.Language = lang;
-        LogUtil.LogInfo($"[ZE-PREP-AFTER] species={pk.Species} lang={pk.Language}", "Legality");
         var validatedLanguage = pk.Language;
 
         // CRITICAL: Asian languages only support 6-character OT names
