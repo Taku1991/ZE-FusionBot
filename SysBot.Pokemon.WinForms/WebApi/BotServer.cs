@@ -1017,7 +1017,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
         const int endPort = 8090; // Reduced from 8181 to 8090 for faster scanning
         const int maxConcurrentScans = 5; // Throttle concurrent connections
 
-        var semaphore = new SemaphoreSlim(maxConcurrentScans, maxConcurrentScans);
+        using var semaphore = new SemaphoreSlim(maxConcurrentScans, maxConcurrentScans);
         var tasks = new List<Task>();
 
         for (int port = startPort; port <= endPort; port++)
@@ -1209,7 +1209,7 @@ public partial class BotServer(Main mainForm, int port = 8080, int tcpPort = 808
 
         try
         {
-            var process = Process.GetProcessById(processId);
+            using var process = Process.GetProcessById(processId);
             return process.MainModule?.FileName;
         }
         catch
