@@ -8,7 +8,7 @@ public static class PokeBot
 
     public const string ConfigPath = "config.json";
 
-    public const string Version = "v8.0.2";
+    public const string Version = "v8.0.2-LXC";
 
     /// <summary>
     /// Checks if a user can use AutoOT functionality.
