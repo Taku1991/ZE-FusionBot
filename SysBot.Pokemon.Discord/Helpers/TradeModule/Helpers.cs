@@ -1789,7 +1789,6 @@ public static class Helpers<T> where T : PKM, new()
             lgcode: lgcode, ignoreAutoOT: ignoreAutoOT, setEdited: setEdited, isNonNative: isNonNative).ConfigureAwait(false);
     }
 
-<<<<<<< HEAD
     public static bool ContainsBatchCommands(string content)
     {
         // Check for ANY batch command patterns (not trainer-specific)

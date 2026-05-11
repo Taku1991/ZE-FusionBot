@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-<<<<<<< HEAD
       "Bash(dotnet build:*)",
       "Bash(git restore:*)",
       "Bash(dotnet clean:*)",
@@ -17,10 +16,8 @@
       "Bash(do:*)",
       "Bash(python3:*)",
       "Bash(PYTHONIOENCODING=utf-8 python3:*)",
-      "Bash(grep -v \"definition\\\\|static\\\\|public\\\\|//\")"
-=======
+      "Bash(grep -v \"definition\\\\|static\\\\|public\\\\|//\")",
       "Bash(xargs grep *)"
->>>>>>> upstream/main
     ]
   }
 }
