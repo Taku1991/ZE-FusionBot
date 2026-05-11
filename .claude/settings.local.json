@@ -6,7 +6,8 @@
       "Bash(dotnet clean:*)",
       "Bash(git add:*)",
       "Bash(paste:*)",
-      "Bash(dotnet publish:*)"
+      "Bash(dotnet publish:*)",
+      "Bash(xargs grep *)"
     ]
   }
 }
